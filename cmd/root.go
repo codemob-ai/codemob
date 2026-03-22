@@ -14,6 +14,12 @@ import (
 	"github.com/codemob-ai/codemob/internal/mob"
 )
 
+func mobStatus(msg string) {
+	fmt.Println()
+	fmt.Println("  [codemob] " + msg)
+	fmt.Println()
+}
+
 // Version is set at build time via ldflags.
 var Version = "dev"
 
@@ -177,7 +183,7 @@ func cmdNew(args []string) error {
 		return err
 	}
 
-	fmt.Printf("Created mob '%s' on branch %s\n", name, branch)
+	mobStatus(fmt.Sprintf("Created mob '%s' on branch %s", name, branch))
 
 	if !noLaunch {
 		return launchAgent(root, agent, worktreePath, false)
@@ -246,7 +252,7 @@ func cmdResume(args []string) error {
 	}
 
 	worktreePath := filepath.Join(root, mob.MobsDir, m.Name)
-	fmt.Printf("Resuming mob '%s'\n", m.Name)
+	mobStatus(fmt.Sprintf("Resuming mob '%s'", m.Name))
 
 	if !noLaunch {
 		return launchAgent(root, m.Agent, worktreePath, true)
@@ -399,7 +405,7 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 		if m == nil {
 			return "", "", false, fmt.Errorf("mob '%s' not found", next.Target)
 		}
-		fmt.Printf("Switching to mob '%s'\n", m.Name)
+		mobStatus(fmt.Sprintf("Switching to mob '%s'", m.Name))
 		return filepath.Join(root, mob.MobsDir, m.Name), m.Agent, true, nil
 
 	case "change-agent":
@@ -418,7 +424,7 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 		// Update the mob's agent in config
 		m.Agent = newAgent
 		_ = mob.SaveConfig(root, cfg)
-		fmt.Printf("Switching mob '%s' to agent '%s'\n", m.Name, newAgent)
+		mobStatus(fmt.Sprintf("Switching mob '%s' to agent '%s'", m.Name, newAgent))
 		return filepath.Join(root, mob.MobsDir, m.Name), newAgent, false, nil
 
 	case "new":
@@ -443,7 +449,7 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 			return "", "", false, err
 		}
 
-		fmt.Printf("Created mob '%s' on branch %s\n", name, branch)
+		mobStatus(fmt.Sprintf("Created mob '%s' on branch %s", name, branch))
 		return worktreePath, cfg.DefaultAgent, false, nil
 
 	case "remove":
@@ -567,7 +573,7 @@ func runAgent(agent, workdir string, resume bool) error {
 			return nil
 		}
 		// Resume failed (no prior session) — fall back to new session
-		fmt.Println("No previous session found, starting new session...")
+		mobStatus("No previous session found, starting new session")
 	}
 
 	return spawnAgent(binPath, newArgs, workdir)
