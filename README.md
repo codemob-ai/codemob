@@ -1,6 +1,6 @@
 ![codemob](img/banner.png)
 
-Terminal-agnostic AI agent workspace manager. Isolated git worktrees, no tmux required.
+Terminal-agnostic AI agent workspace manager. Parallel coding sessions in isolated git worktrees.
 
 ```bash
 claude --new-mob                 # creates a worktree, launches claude in it
