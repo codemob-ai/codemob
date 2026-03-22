@@ -14,6 +14,9 @@ import (
 	"github.com/codemob-ai/codemob/internal/mob"
 )
 
+// Version is set at build time via ldflags.
+var Version = "dev"
+
 func Execute() error {
 	// Clear stale next action on every invocation (except --check-queue which reads it)
 	if len(os.Args) < 2 || os.Args[1] != "--check-queue" {
@@ -64,7 +67,7 @@ func Execute() error {
 		return cmdWriteNext(args)
 
 	case "--version", "-v", "version":
-		fmt.Println("codemob v0.1.0")
+		fmt.Printf("codemob %s\n", Version)
 		return nil
 	case "--help", "-h", "help":
 		printUsage()

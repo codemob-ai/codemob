@@ -1,3 +1,6 @@
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+LDFLAGS := -ldflags "-X github.com/codemob-ai/codemob/cmd.Version=$(VERSION)"
+
 PREFIX ?= /opt/homebrew
 BINDIR := $(PREFIX)/bin
 SHAREDIR := $(PREFIX)/share/codemob
@@ -5,8 +8,8 @@ SHAREDIR := $(PREFIX)/share/codemob
 .PHONY: build install uninstall test clean
 
 build:
-	@echo "Building codemob..."
-	@go build -o codemob .
+	@echo "Building codemob $(VERSION)..."
+	@go build $(LDFLAGS) -o codemob .
 	@echo "  → ./codemob"
 
 install: build
