@@ -3,13 +3,34 @@
 Terminal-agnostic AI agent workspace manager with parallel isolated sessions.
 Powered by git worktrees under the hood, but you don't need to know that.
 
-```bash
-claude --new-mob                 # creates a worktree, launches claude in it
-codex --new-mob                  # same, but with codex
-codemob --list                   # see what's running
 ```
+~ /my-project
+❯ claude --new-mob
+Created mob 'wild-kumquat' on branch mob/wild-kumquat
+ ▐▛███▜▌   Claude Code
+  ▘▘ ▝▝    ~/my-project/.codemob/mobs/wild-kumquat
 
-Switch between sessions from inside Claude using `/mob-switch`. Switch agents mid-session with `/mob-switch-agent`.
+❯ /mob-switch
+⏺ #  NAME             LAST AGENT  CREATED
+  1  brave-mango      claude      2h ago
+  2  epic-apricot     codex       30m ago
+
+  Which mob? → 2
+
+⏺ Switch queued. Exit (Ctrl+C) and codemob launches the next session.
+
+Switching to mob 'epic-apricot'
+ codex                ~/my-project/.codemob/mobs/epic-apricot
+
+❯ /mob-switch-agent
+  Which agent? → claude
+
+⏺ Agent switch queued. Exit (Ctrl+C).
+
+Switching mob 'epic-apricot' to agent 'claude'
+ ▐▛███▜▌   Claude Code
+  ▘▘ ▝▝    ~/my-project/.codemob/mobs/epic-apricot
+```
 
 ## Install
 
