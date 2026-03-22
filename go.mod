@@ -1,3 +1,3 @@
-module github.com/codemob-ai/codemob-ai
+module github.com/codemob-ai/codemob
 
 go 1.26.1

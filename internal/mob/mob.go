@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	gitutil "github.com/codemob-ai/codemob-ai/internal/git"
+	gitutil "github.com/codemob-ai/codemob/internal/git"
 )
 
 const (

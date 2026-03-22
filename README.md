@@ -45,7 +45,7 @@ Switching mob 'epic-apricot' to agent 'claude'
 ## Install
 
 ```bash
-git clone https://github.com/codemob-ai/codemob-ai.git
+git clone https://github.com/codemob-ai/codemob.git
 cd codemob
 go build -o codemob .
 # put the binary on your PATH, then:
