@@ -12,17 +12,21 @@ import (
 	gitutil "github.com/codemob-ai/codemob/internal/git"
 )
 
-// SlashCommands contains the Claude Code slash command definitions.
-// Embedded here so the binary is self-contained.
-var SlashCommands = map[string]string{
-	"mob-ls.md": "Run `codemob --list` using the Bash tool and display the results to the user.\n",
-	"mob-new.md": `Ask the user for a name for the new mob (or suggest generating one automatically).
+// slashCommandDefs defines the slash command content. Each is installed under both
+// "mob-*" and "codemob-*" names so either /mob-ls or /codemob-ls works.
+var slashCommandDefs = map[string]string{
+	"ls": "List all codemob workspaces and their status.\n\nRun `codemob --list` using the Bash tool and display the results to the user.\n",
+	"new": `Create a new codemob workspace and copy the launch command to clipboard.
+
+Ask the user for a name for the new mob (or suggest generating one automatically).
 
 Once you have the name, copy the following command to the clipboard using ` + "`echo \"codemob --new <name>\" | pbcopy`" + ` (replace ` + "`<name>`" + ` with the actual name).
 
 Then tell the user: "The command has been copied to your clipboard. Exit this session (Ctrl+C) and paste (Cmd+V) to create the new mob."
 `,
-	"mob-resume.md": `Run ` + "`codemob --list`" + ` using the Bash tool and display the results to the user.
+	"resume": `Resume an existing codemob workspace and copy the launch command to clipboard.
+
+Run ` + "`codemob --list`" + ` using the Bash tool and display the results to the user.
 
 Ask the user which mob they want to resume.
 
@@ -30,7 +34,9 @@ Once they pick one, copy the following command to the clipboard using ` + "`echo
 
 Then tell the user: "The command has been copied to your clipboard. Exit this session (Ctrl+C) and paste (Cmd+V) to resume the mob."
 `,
-	"mob-switch.md": `Run ` + "`codemob --list`" + ` using the Bash tool and display the results to the user.
+	"switch": `Switch to a different codemob workspace and copy the launch command to clipboard.
+
+Run ` + "`codemob --list`" + ` using the Bash tool and display the results to the user.
 
 Ask the user which mob they want to switch to.
 
@@ -38,12 +44,24 @@ Once they pick one, copy the following command to the clipboard using ` + "`echo
 
 Then tell the user: "The command has been copied to your clipboard. Exit this session (Ctrl+C) and paste (Cmd+V) to switch to the mob."
 `,
-	"mob-remove.md": `Run ` + "`codemob --list`" + ` using the Bash tool and display the results to the user.
+	"remove": `Remove a codemob workspace (worktree + branch).
+
+Run ` + "`codemob --list`" + ` using the Bash tool and display the results to the user.
 
 Ask the user which mob they want to remove.
 
 Once they confirm, run ` + "`codemob remove <name>`" + ` using the Bash tool (replace ` + "`<name>`" + ` with the chosen mob name) and display the result.
 `,
+}
+
+// SlashCommands returns the full map of filename → content, with both mob-* and codemob-* variants.
+func SlashCommands() map[string]string {
+	cmds := make(map[string]string)
+	for name, content := range slashCommandDefs {
+		cmds["mob-"+name+".md"] = content
+		cmds["codemob-"+name+".md"] = content
+	}
+	return cmds
 }
 
 const (
@@ -182,7 +200,7 @@ func setupClaudeCommands() {
 	os.MkdirAll(commandsDir, 0755)
 
 	installed := 0
-	for name, content := range SlashCommands {
+	for name, content := range SlashCommands() {
 		dest := filepath.Join(commandsDir, name)
 		// Check if file exists and has same content
 		existing, err := os.ReadFile(dest)
