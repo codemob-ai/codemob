@@ -24,7 +24,7 @@ _codemob_launch_agent() {
       ;;
     codex)
       if [[ "$mode" == "resume" ]]; then
-        command codex --resume
+        command codex resume --last
       else
         command codex
       fi
