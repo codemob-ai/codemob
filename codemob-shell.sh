@@ -13,7 +13,10 @@ claude() {
     --new-mob|--new-codemob)       shift; codemob --new "$@" ;;
     --resume-mob|--resume-codemob) shift; codemob --resume "$@" ;;
     --list-mob|--list-mobs|--list-codemob|--list-codemobs) shift; codemob --list "$@" ;;
-    *) command claude "$@" ;;
+    *)
+      command claude "$@"
+      codemob --check-next
+      ;;
   esac
 }
 
@@ -22,6 +25,9 @@ codex() {
     --new-mob|--new-codemob)       shift; codemob --new --agent codex "$@" ;;
     --resume-mob|--resume-codemob) shift; codemob --resume "$@" ;;
     --list-mob|--list-mobs|--list-codemob|--list-codemobs) shift; codemob --list "$@" ;;
-    *) command codex "$@" ;;
+    *)
+      command codex "$@"
+      codemob --check-next
+      ;;
   esac
 }

@@ -14,9 +14,11 @@ import (
 )
 
 func Execute() error {
-	// Clear any stale next action on every invocation
-	if root, err := mob.FindRepoRoot(); err == nil {
-		mob.ClearNextAction(root)
+	// Clear stale next action on every invocation (except --check-next which reads it)
+	if len(os.Args) < 2 || os.Args[1] != "--check-next" {
+		if root, err := mob.FindRepoRoot(); err == nil {
+			mob.ClearNextAction(root)
+		}
 	}
 
 	if len(os.Args) < 2 {
@@ -37,6 +39,8 @@ func Execute() error {
 		return cmdList(args, true)
 	case "--resume", "--switch":
 		return cmdResume(args)
+	case "--check-next":
+		return cmdCheckNext(args)
 
 	// Subcommands (management)
 	case "init", "reinit":
@@ -349,6 +353,36 @@ func cmdClear(_ []string) error {
 
 	fmt.Println("All mobs cleared.")
 	return nil
+}
+
+func cmdCheckNext(_ []string) error {
+	root, err := mob.FindRepoRoot()
+	if err != nil {
+		return nil // not in a repo, nothing to do
+	}
+
+	next, err := mob.ReadNextAction(root)
+	if err != nil || next == nil {
+		return nil // no queued action
+	}
+	mob.ClearNextAction(root)
+
+	switch next.Action {
+	case "switch":
+		cfg, err := mob.LoadConfig(root)
+		if err != nil {
+			return err
+		}
+		m := mob.FindMob(cfg, next.Target)
+		if m == nil {
+			return fmt.Errorf("mob '%s' not found", next.Target)
+		}
+		worktreePath := filepath.Join(root, mob.MobsDir, m.Name)
+		fmt.Printf("Switching to mob '%s'\n", m.Name)
+		return launchAgent(root, m.Agent, worktreePath, true)
+	default:
+		return fmt.Errorf("unknown next action: %s", next.Action)
+	}
 }
 
 func cmdDetectBranch(_ []string) error {
