@@ -10,7 +10,8 @@ build:
 	@echo "  → ./codemob"
 
 install: build
-	@echo "Installing to $(PREFIX)..."
+	@echo "Dev install — emulating Homebrew layout at $(PREFIX)"
+	@echo ""
 	@mkdir -p $(BINDIR) $(SHAREDIR)
 	@cp codemob $(BINDIR)/codemob
 	@cp codemob-shell.sh $(SHAREDIR)/codemob-shell.sh
