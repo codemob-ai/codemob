@@ -1,11 +1,6 @@
-<p align="center">
-  <img src="img/banner.png" alt="codemob" width="600">
-</p>
+![codemob](img/banner.png)
 
-<p align="center">
-  Git worktree manager for AI agent workspaces.<br>
-  Run multiple AI coding sessions in isolated worktrees without touching git commands.
-</p>
+Git worktree manager for AI agent workspaces. Run multiple AI coding sessions in isolated worktrees without touching git commands.
 
 ## What it does
 
