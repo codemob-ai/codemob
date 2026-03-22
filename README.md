@@ -3,7 +3,7 @@
 Terminal-agnostic AI agent workspace manager with parallel isolated sessions.
 Powered by git worktrees under the hood, but you don't need to know that.
 
-Start a new session — codemob creates an isolated workspace and drops you into Claude:
+Start a new session — codemob creates an isolated workspace and drops you into your agent:
 
 ```bash
 ~/my-project
