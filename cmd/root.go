@@ -16,7 +16,7 @@ import (
 
 func mobStatus(msg string) {
 	fmt.Println()
-	fmt.Println("  [codemob] " + msg)
+	fmt.Printf("  \033[0;32m●\033[0m \033[1mcodemob\033[0m  %s\n", msg)
 	fmt.Println()
 }
 
