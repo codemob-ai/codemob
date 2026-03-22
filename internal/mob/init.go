@@ -561,7 +561,7 @@ func Uninstall(installDir string) error {
 
 	// Remove shell integration
 	rcFile, rcName := detectShellRC()
-	if removeLinesFromFile(rcFile, "codemob") {
+	if removeCodemobLines(rcFile) {
 		info(fmt.Sprintf("Removed codemob lines from %s", rcName))
 	} else {
 		info(fmt.Sprintf("No codemob lines found in %s", rcName))
@@ -579,7 +579,7 @@ func Uninstall(installDir string) error {
 		gitignoreFile = filepath.Join(os.Getenv("HOME"), gitignoreFile[1:])
 	}
 
-	if removeLinesFromFile(gitignoreFile, "codemob") {
+	if removeCodemobLines(gitignoreFile) {
 		info("Removed codemob entries from global gitignore")
 	} else {
 		info("No codemob entries found in global gitignore")
@@ -607,22 +607,30 @@ func Uninstall(installDir string) error {
 	return nil
 }
 
-// removeLinesFromFile removes all lines containing substr from a file.
+// removeCodemobLines removes lines matching specific codemob markers from a file.
+// Only removes lines containing "codemob-shell.sh", "codemob.sh", or "# codemob".
 // Returns true if any lines were removed.
-func removeLinesFromFile(path, substr string) bool {
+func removeCodemobLines(path string) bool {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return false
 	}
 
+	markers := []string{"codemob-shell.sh", "codemob.sh", "# codemob"}
 	lines := strings.Split(string(data), "\n")
 	var kept []string
 	removed := false
 
 	for _, line := range lines {
-		if strings.Contains(line, substr) {
+		matched := false
+		for _, marker := range markers {
+			if strings.Contains(line, marker) {
+				matched = true
+				break
+			}
+		}
+		if matched {
 			removed = true
-			// Also skip preceding blank line
 			if len(kept) > 0 && strings.TrimSpace(kept[len(kept)-1]) == "" {
 				kept = kept[:len(kept)-1]
 			}

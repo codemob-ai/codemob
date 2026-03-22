@@ -30,7 +30,7 @@ uninstall:
 	@echo "  Done."
 
 test:
-	@go test ./internal/mob/ -count=1 -v
+	@go test ./... -count=1 -v
 
 clean:
 	@rm -f codemob

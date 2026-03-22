@@ -89,6 +89,33 @@ func Reconcile(repoRoot string, cfg *Config) bool {
 	return changed
 }
 
+// ValidateName checks if a mob name is safe for use in paths and branches.
+func ValidateName(name string) error {
+	if name == "" {
+		return fmt.Errorf("mob name cannot be empty")
+	}
+	if len(name) > 60 {
+		return fmt.Errorf("mob name too long (max 60 characters)")
+	}
+	// Reject all-numeric names — ambiguous with index-based resolution
+	allDigits := true
+	for _, c := range name {
+		if !((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-') {
+			return fmt.Errorf("mob name can only contain lowercase letters, numbers, and hyphens")
+		}
+		if c < '0' || c > '9' {
+			allDigits = false
+		}
+	}
+	if allDigits {
+		return fmt.Errorf("mob name cannot be purely numeric (conflicts with index-based selection)")
+	}
+	if name[0] == '-' || name[len(name)-1] == '-' {
+		return fmt.Errorf("mob name cannot start or end with a hyphen")
+	}
+	return nil
+}
+
 // CurrentMobName returns the name of the mob we're currently inside, or "" if not in a mob.
 func CurrentMobName() string {
 	cwd, err := os.Getwd()

@@ -44,6 +44,8 @@ func setupTestRepo(t *testing.T) (string, string) {
 	os.MkdirAll(repoPath, 0755)
 
 	run(t, repoPath, "git", "init")
+	run(t, repoPath, "git", "config", "user.email", "test@codemob.ai")
+	run(t, repoPath, "git", "config", "user.name", "codemob-test")
 	run(t, repoPath, "git", "commit", "--allow-empty", "-m", "init")
 
 	return tmpHome, repoPath
@@ -111,17 +113,6 @@ func readConfig(t *testing.T, repoPath string) map[string]interface{} {
 	return cfg
 }
 
-// parseResult parses CODEMOB_KEY=value lines into a map.
-func parseResult(output string) map[string]string {
-	result := make(map[string]string)
-	for _, line := range strings.Split(output, "\n") {
-		if strings.HasPrefix(line, "CODEMOB_") && strings.Contains(line, "=") {
-			parts := strings.SplitN(line, "=", 2)
-			result[parts[0]] = parts[1]
-		}
-	}
-	return result
-}
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 

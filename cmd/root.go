@@ -161,6 +161,10 @@ func cmdNew(args []string) error {
 		name = mob.GenerateName()
 	}
 
+	if err := mob.ValidateName(name); err != nil {
+		return err
+	}
+
 	if m := mob.FindMob(cfg, name); m != nil {
 		return fmt.Errorf("mob '%s' already exists", name)
 	}
@@ -324,7 +328,7 @@ func cmdRemove(args []string) error {
 
 	var remaining []mob.Mob
 	for _, existing := range cfg.Mobs {
-		if existing.Name != name {
+		if existing.Name != m.Name {
 			remaining = append(remaining, existing)
 		}
 	}
@@ -334,7 +338,7 @@ func cmdRemove(args []string) error {
 		return err
 	}
 
-	fmt.Printf("Removed mob '%s'\n", name)
+	fmt.Printf("Removed mob '%s'\n", m.Name)
 	return nil
 }
 
@@ -432,6 +436,12 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 		if name == "" {
 			name = mob.GenerateName()
 		}
+		if err := mob.ValidateName(name); err != nil {
+			return "", "", false, err
+		}
+		if m := mob.FindMob(cfg, name); m != nil {
+			return "", "", false, fmt.Errorf("mob '%s' already exists", name)
+		}
 		branch := "mob/" + name
 		worktreePath := filepath.Join(root, mob.MobsDir, name)
 
@@ -468,7 +478,7 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 		_ = gitutil.BranchDelete(root, m.Branch)
 		var remaining []mob.Mob
 		for _, existing := range cfg.Mobs {
-			if existing.Name != name {
+			if existing.Name != m.Name {
 				remaining = append(remaining, existing)
 			}
 		}
@@ -494,18 +504,6 @@ func executeNextAction(root string, next *mob.QueuedAction) error {
 	return launchAgent(root, agent, workdir, resume)
 }
 
-func cmdDetectBranch(_ []string) error {
-	root, err := mob.FindRepoRoot()
-	if err != nil {
-		root, _ = gitutil.RepoRoot()
-	}
-	if root == "" {
-		fmt.Println("main")
-		return nil
-	}
-	fmt.Println(gitutil.DetectDefaultBranch(root))
-	return nil
-}
 
 // cmdWriteNext writes a next action for the trampoline.
 // Used by slash commands: codemob queue switch <mob-name>
@@ -537,7 +535,12 @@ func cmdWriteNext(args []string) error {
 // After the agent exits, it checks for a next action (e.g., switch to another mob).
 func launchAgent(root, agent, workdir string, resume bool) error {
 	for {
-		_ = runAgent(agent, workdir, resume)
+		if err := runAgent(agent, workdir, resume); err != nil {
+			// Log non-signal errors (signal exits are normal — user pressed Ctrl+C)
+			if _, ok := err.(*exec.ExitError); !ok {
+				fmt.Fprintf(os.Stderr, "  [codemob] agent error: %v\n", err)
+			}
+		}
 
 		// Always check for queued action, regardless of how the agent exited
 		next, err := mob.ReadQueuedAction(root)
@@ -605,19 +608,24 @@ func spawnAgent(binPath string, args []string, workdir string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	// Forward signals to child
+	// Forward signals to child, clean up goroutine on exit
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt)
+	done := make(chan struct{})
 	go func() {
-		for sig := range sigCh {
+		select {
+		case sig := <-sigCh:
 			if cmd.Process != nil {
 				cmd.Process.Signal(sig)
 			}
+		case <-done:
 		}
 	}()
-	defer signal.Stop(sigCh)
 
-	return cmd.Run()
+	err := cmd.Run()
+	signal.Stop(sigCh)
+	close(done)
+	return err
 }
 
 func printUsage() {

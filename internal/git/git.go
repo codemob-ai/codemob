@@ -1,6 +1,7 @@
 package git
 
 import (
+	"bytes"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -73,11 +74,14 @@ func runGit(dir string, args ...string) (string, error) {
 	if dir != "" {
 		cmd.Dir = dir
 	}
-	out, err := cmd.CombinedOutput()
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
 	if err != nil {
-		return string(out), fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err)
+		return stdout.String(), fmt.Errorf("%s: %w", strings.TrimSpace(stderr.String()), err)
 	}
-	return string(out), nil
+	return stdout.String(), nil
 }
 
 func parseWorktreeList(raw string) []WorktreeInfo {
