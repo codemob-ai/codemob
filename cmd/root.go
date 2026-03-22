@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
-	"syscall"
 	"text/tabwriter"
 	"time"
 
@@ -14,6 +14,11 @@ import (
 )
 
 func Execute() error {
+	// Clear any stale next action on every invocation
+	if root, err := mob.FindRepoRoot(); err == nil {
+		mob.ClearNextAction(root)
+	}
+
 	if len(os.Args) < 2 {
 		printUsage()
 		return nil
@@ -39,13 +44,15 @@ func Execute() error {
 	case "remove":
 		return cmdRemove(args)
 
-	// Internal (used by shell wrapper)
+	// Internal
 	case "new":
 		return cmdNew(args)
 	case "list":
 		return cmdList(args)
 	case "resolve":
 		return cmdResolve(args)
+	case "write-next":
+		return cmdWriteNext(args)
 
 	case "--version", "-v", "version":
 		fmt.Println("codemob v0.1.0")
@@ -149,7 +156,7 @@ func cmdNew(args []string) error {
 	fmt.Printf("Created mob '%s' on branch %s\n", name, branch)
 
 	if !noLaunch {
-		return launchAgent(agent, worktreePath, false)
+		return launchAgent(root, agent, worktreePath, false)
 	}
 	return nil
 }
@@ -206,7 +213,7 @@ func cmdResume(args []string) error {
 	fmt.Printf("Resuming mob '%s'\n", m.Name)
 
 	if !noLaunch {
-		return launchAgent(m.Agent, worktreePath, true)
+		return launchAgent(root, m.Agent, worktreePath, true)
 	}
 	return nil
 }
@@ -302,8 +309,59 @@ func cmdDetectBranch(_ []string) error {
 	return nil
 }
 
-// launchAgent replaces the current process with the agent in the given directory.
-func launchAgent(agent, workdir string, resume bool) error {
+// cmdWriteNext writes a next action for the trampoline.
+// Used by slash commands: codemob write-next switch <mob-name>
+func cmdWriteNext(args []string) error {
+	if len(args) < 2 {
+		return fmt.Errorf("usage: codemob write-next <action> <target>")
+	}
+	root, err := mob.FindRepoRoot()
+	if err != nil {
+		return err
+	}
+	return mob.WriteNextAction(root, mob.NextAction{
+		Action: args[0],
+		Target: args[1],
+	})
+}
+
+// launchAgent spawns the agent as a child process and implements the trampoline loop.
+// After the agent exits, it checks for a next action (e.g., switch to another mob).
+func launchAgent(root, agent, workdir string, resume bool) error {
+	for {
+		if err := runAgent(agent, workdir, resume); err != nil {
+			return err
+		}
+
+		// Check for next action
+		next, err := mob.ReadNextAction(root)
+		if err != nil || next == nil {
+			return nil // normal exit
+		}
+		mob.ClearNextAction(root)
+
+		switch next.Action {
+		case "switch":
+			cfg, err := mob.LoadConfig(root)
+			if err != nil {
+				return err
+			}
+			m := mob.FindMob(cfg, next.Target)
+			if m == nil {
+				return fmt.Errorf("mob '%s' not found", next.Target)
+			}
+			workdir = filepath.Join(root, mob.MobsDir, m.Name)
+			agent = m.Agent
+			resume = true
+			fmt.Printf("Switching to mob '%s'\n", m.Name)
+		default:
+			return fmt.Errorf("unknown next action: %s", next.Action)
+		}
+	}
+}
+
+// runAgent spawns the agent process and waits for it to exit.
+func runAgent(agent, workdir string, resume bool) error {
 	var agentBin string
 	var agentArgs []string
 
@@ -311,33 +369,45 @@ func launchAgent(agent, workdir string, resume bool) error {
 	case "claude":
 		agentBin = "claude"
 		if resume {
-			agentArgs = []string{"claude", "--continue"}
+			agentArgs = []string{"--continue"}
 		} else {
-			agentArgs = []string{"claude"}
+			agentArgs = []string{}
 		}
 	case "codex":
 		agentBin = "codex"
 		if resume {
-			agentArgs = []string{"codex", "resume", "--last"}
+			agentArgs = []string{"resume", "--last"}
 		} else {
-			agentArgs = []string{"codex"}
+			agentArgs = []string{}
 		}
 	default:
 		return fmt.Errorf("unknown agent: %s", agent)
 	}
 
-	// Find the agent binary on PATH
 	binPath, err := exec.LookPath(agentBin)
 	if err != nil {
 		return fmt.Errorf("agent '%s' not found on PATH", agentBin)
 	}
 
-	// Change to worktree directory and exec the agent
-	if err := os.Chdir(workdir); err != nil {
-		return fmt.Errorf("could not change to worktree: %w", err)
-	}
+	cmd := exec.Command(binPath, agentArgs...)
+	cmd.Dir = workdir
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 
-	return syscall.Exec(binPath, agentArgs, os.Environ())
+	// Forward signals to child
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt)
+	go func() {
+		for sig := range sigCh {
+			if cmd.Process != nil {
+				cmd.Process.Signal(sig)
+			}
+		}
+	}()
+	defer signal.Stop(sigCh)
+
+	return cmd.Run()
 }
 
 func printUsage() {

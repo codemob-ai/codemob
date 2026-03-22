@@ -24,15 +24,15 @@ Once you have the name, copy the following command to the clipboard using ` + "`
 
 Then tell the user: "The command has been copied to your clipboard. Exit this session (Ctrl+C) and paste (Cmd+V) to create the new mob."
 `,
-	"switch": `Switch to a different codemob workspace and copy the launch command to clipboard.
+	"switch": `Switch to a different codemob workspace.
 
 Run ` + "`codemob --list`" + ` using the Bash tool and display the results to the user.
 
 Ask the user which mob they want to switch to.
 
-Once they pick one, copy the following command to the clipboard using ` + "`echo \"codemob --switch <name>\" | pbcopy`" + ` (replace ` + "`<name>`" + ` with the chosen mob name).
+Once they pick one, run ` + "`codemob write-next switch <name>`" + ` using the Bash tool (replace ` + "`<name>`" + ` with the chosen mob name).
 
-Then tell the user: "The command has been copied to your clipboard. Exit this session (Ctrl+C) and paste (Cmd+V) to switch to the mob."
+Then tell the user: "Switch queued. Exit this session (Ctrl+C) and codemob will automatically launch the new mob."
 `,
 	"remove": `Remove a codemob workspace (worktree + branch).
 
