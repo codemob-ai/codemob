@@ -1,16 +1,21 @@
-# codemob
+<p align="center">
+  <img src="img/banner.png" alt="codemob" width="600">
+</p>
 
-Git worktree manager for AI agent workspaces. Run multiple AI coding sessions in isolated worktrees without touching git commands.
+<p align="center">
+  Git worktree manager for AI agent workspaces.<br>
+  Run multiple AI coding sessions in isolated worktrees without touching git commands.
+</p>
 
 ## What it does
 
 Each "mob" is a git worktree where an AI agent (Claude Code, Codex, etc.) works independently. codemob manages the lifecycle: create, list, switch, remove.
 
 ```
-codemob --new fix-auth       # creates worktree, launches claude in it
+codemob --new brave-mango       # creates worktree, launches claude in it
 codemob --list               # shows all mobs
-codemob --resume fix-auth    # cd into worktree, launch agent
-codemob remove fix-auth      # clean up worktree + branch
+codemob --resume brave-mango    # cd into worktree, launch agent
+codemob remove brave-mango      # clean up worktree + branch
 ```
 
 ## Install
@@ -36,23 +41,23 @@ codemob init
 ### From terminal
 
 ```bash
-codemob --new                    # auto-generated name (e.g., brave-mango)
-codemob --new fix-auth           # named mob
+codemob --new                    # auto-generated name (e.g., wild-kumquat)
+codemob --new brave-mango           # named mob
 codemob --new --agent codex      # use codex instead of claude
 codemob --list                   # list all mobs with indices
-codemob --resume fix-auth        # resume by name
+codemob --resume brave-mango        # resume by name
 codemob --resume 2               # resume by index
-codemob remove fix-auth          # remove a mob
+codemob remove brave-mango          # remove a mob
 codemob clear                    # remove all mobs
 ```
 
 ### Shell aliases (after `codemob init`)
 
 ```bash
-mob --new fix-auth               # short alias
-claude --new-mob fix-auth        # create mob + launch claude
-claude --resume-mob fix-auth     # resume mob in claude
-codex --new-codemob fix-auth     # create mob + launch codex
+mob --new brave-mango               # short alias
+claude --new-mob brave-mango        # create mob + launch claude
+claude --resume-mob brave-mango     # resume mob in claude
+codex --new-codemob brave-mango     # create mob + launch codex
 ```
 
 ### From inside Claude Code
@@ -90,7 +95,7 @@ All state lives in `.codemob/` inside the repo:
   config.json       # mobs metadata, default agent, base branch
   queue.json        # pending action (written by slash commands)
   mobs/
-    fix-auth/       # actual git worktree
+    brave-mango/       # actual git worktree
     add-caching/    # actual git worktree
 ```
 
