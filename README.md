@@ -101,6 +101,8 @@ make install    # builds and copies to /opt/homebrew
 codemob init
 ```
 
+`codemob` and `mob` are interchangeable — use whichever you prefer.
+
 ## Usage
 
 ```bash
