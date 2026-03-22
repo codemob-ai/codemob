@@ -238,10 +238,8 @@ func setupShellIntegration(installDir string) {
 }
 
 var codemobPermissions = []string{
-	"Bash(codemob --list)",
-	"Bash(codemob --list-others)",
-	"Bash(codemob queue *)",
-	"Bash(codemob remove *)",
+	"Bash(codemob *)",
+	"Bash(mob *)",
 }
 
 func setupClaudePermissions() {
