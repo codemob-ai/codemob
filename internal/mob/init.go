@@ -243,13 +243,22 @@ var codemobPermissions = []string{
 }
 
 func setupClaudePermissions() {
+	defer func() {
+		if r := recover(); r != nil {
+			warn(fmt.Sprintf("Could not configure Claude permissions: %v", r))
+		}
+	}()
+
 	settingsPath := filepath.Join(os.Getenv("HOME"), ".claude", "settings.json")
 
 	// Read existing settings or start fresh
 	var settings map[string]interface{}
 	data, err := os.ReadFile(settingsPath)
 	if err == nil {
-		json.Unmarshal(data, &settings)
+		if err := json.Unmarshal(data, &settings); err != nil {
+			warn(fmt.Sprintf("Could not parse Claude settings: %v", err))
+			return
+		}
 	}
 	if settings == nil {
 		settings = make(map[string]interface{})
@@ -288,11 +297,82 @@ func setupClaudePermissions() {
 	perms["allow"] = allowList
 	settings["permissions"] = perms
 
-	os.MkdirAll(filepath.Dir(settingsPath), 0755)
+	if err := os.MkdirAll(filepath.Dir(settingsPath), 0755); err != nil {
+		warn(fmt.Sprintf("Could not create Claude settings directory: %v", err))
+		return
+	}
 	out, _ := json.MarshalIndent(settings, "", "  ")
-	os.WriteFile(settingsPath, append(out, '\n'), 0644)
+	if err := os.WriteFile(settingsPath, append(out, '\n'), 0644); err != nil {
+		warn(fmt.Sprintf("Could not write Claude settings: %v", err))
+		return
+	}
 
 	info("Added codemob permissions to Claude settings")
+}
+
+func removeClaudePermissions() {
+	defer func() {
+		if r := recover(); r != nil {
+			warn(fmt.Sprintf("Could not clean up Claude permissions: %v", r))
+		}
+	}()
+
+	settingsPath := filepath.Join(os.Getenv("HOME"), ".claude", "settings.json")
+
+	data, err := os.ReadFile(settingsPath)
+	if err != nil {
+		info("No Claude settings to clean up")
+		return
+	}
+
+	var settings map[string]interface{}
+	if err := json.Unmarshal(data, &settings); err != nil {
+		warn(fmt.Sprintf("Could not parse Claude settings: %v", err))
+		return
+	}
+
+	perms, _ := settings["permissions"].(map[string]interface{})
+	if perms == nil {
+		info("No Claude permissions to clean up")
+		return
+	}
+
+	allowList, _ := perms["allow"].([]interface{})
+	if len(allowList) == 0 {
+		info("No Claude permissions to clean up")
+		return
+	}
+
+	toRemove := make(map[string]bool)
+	for _, perm := range codemobPermissions {
+		toRemove[perm] = true
+	}
+
+	var filtered []interface{}
+	removed := 0
+	for _, p := range allowList {
+		if s, ok := p.(string); ok && toRemove[s] {
+			removed++
+			continue
+		}
+		filtered = append(filtered, p)
+	}
+
+	if removed == 0 {
+		info("No codemob permissions found in Claude settings")
+		return
+	}
+
+	perms["allow"] = filtered
+	settings["permissions"] = perms
+
+	out, _ := json.MarshalIndent(settings, "", "  ")
+	if err := os.WriteFile(settingsPath, append(out, '\n'), 0644); err != nil {
+		warn(fmt.Sprintf("Could not write Claude settings: %v", err))
+		return
+	}
+
+	info("Removed codemob permissions from Claude settings")
 }
 
 func setupClaudeCommands(repoRoot string) {
@@ -453,6 +533,9 @@ func Uninstall(installDir string) error {
 	} else {
 		info("No codemob entries found in global gitignore")
 	}
+
+	// Remove Claude permissions
+	removeClaudePermissions()
 
 	fmt.Println()
 	info("Uninstalled. Open a new terminal for changes to take effect.")
