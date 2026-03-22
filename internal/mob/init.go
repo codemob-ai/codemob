@@ -219,7 +219,7 @@ func setupClaudeCommands(repoRoot string) {
 	}
 
 	if installed > 0 {
-		info(fmt.Sprintf("Installed %d Claude slash command(s) to ~/.claude/commands/", installed))
+		info("Installed Claude slash commands")
 	} else {
 		info("Claude slash commands are up to date")
 	}
