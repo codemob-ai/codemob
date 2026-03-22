@@ -88,11 +88,11 @@ func Init(installDir string) error {
 	}
 	setupGlobalGitignore()
 	setupShellIntegration(installDir)
-	setupClaudeCommands()
 
 	fmt.Println()
 	fmt.Println("Repo setup:")
-	setupRepo()
+	repoRoot := setupRepo()
+	setupClaudeCommands(repoRoot)
 
 	_, rcName := detectShellRC()
 	fmt.Println()
@@ -128,9 +128,9 @@ func setupGlobalGitignore() {
 	// Ensure parent dir exists
 	os.MkdirAll(filepath.Dir(gitignoreFile), 0755)
 
-	// Check if already contains .codemob/
-	if fileContains(gitignoreFile, ".codemob/") {
-		info("Global gitignore already contains .codemob/")
+	// Check if already set up
+	if fileContains(gitignoreFile, ".codemob/") && fileContains(gitignoreFile, "mob-*.md") {
+		info("Global gitignore already configured for codemob")
 		return
 	}
 
@@ -142,8 +142,8 @@ func setupGlobalGitignore() {
 	}
 	defer f.Close()
 
-	f.WriteString("\n# codemob workspaces\n.codemob/\n")
-	info(fmt.Sprintf("Added .codemob/ to global gitignore (%s)", gitignoreFile))
+	f.WriteString("\n# codemob\n.codemob/\n.claude/commands/mob-*.md\n.claude/commands/codemob-*.md\n")
+	info(fmt.Sprintf("Added codemob entries to global gitignore (%s)", gitignoreFile))
 }
 
 func detectShellRC() (string, string) {
@@ -195,8 +195,12 @@ func setupShellIntegration(installDir string) {
 	info(fmt.Sprintf("Added shell integration to %s", rcName))
 }
 
-func setupClaudeCommands() {
-	commandsDir := filepath.Join(os.Getenv("HOME"), ".claude", "commands")
+func setupClaudeCommands(repoRoot string) {
+	if repoRoot == "" {
+		warn("Not inside a git repository. Skipping Claude commands setup.")
+		return
+	}
+	commandsDir := filepath.Join(repoRoot, ".claude", "commands")
 	os.MkdirAll(commandsDir, 0755)
 
 	installed := 0
@@ -221,12 +225,12 @@ func setupClaudeCommands() {
 	}
 }
 
-func setupRepo() {
+func setupRepo() string {
 	root, err := gitutil.RepoRoot()
 	if err != nil {
 		warn("Not inside a git repository. Skipping repo setup.")
 		warn("Run 'codemob init' again from inside a git repo to set up a project.")
-		return
+		return ""
 	}
 
 	codemobDir := filepath.Join(root, CodemobDir)
@@ -237,7 +241,7 @@ func setupRepo() {
 
 	if _, err := os.Stat(configFile); err == nil {
 		info(fmt.Sprintf("Repo already initialized at %s", root))
-		return
+		return root
 	}
 
 	// Detect base branch
@@ -264,6 +268,7 @@ func setupRepo() {
 
 	_ = codemobDir
 	info(fmt.Sprintf("Created %s (base_branch: %s)", configFile, defaultBranch))
+	return root
 }
 
 // ─── File helpers ─────────────────────────────────────────────────────────────

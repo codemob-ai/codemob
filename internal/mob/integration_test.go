@@ -157,8 +157,8 @@ func TestInit(t *testing.T) {
 		t.Error("global gitignore does not contain .codemob/")
 	}
 
-	// then -> slash commands should be installed (both mob-* and codemob-* variants)
-	commandsDir := filepath.Join(home, ".claude", "commands")
+	// then -> slash commands should be installed in the project's .claude/commands/
+	commandsDir := filepath.Join(repoPath, ".claude", "commands")
 	for _, name := range []string{
 		"mob-ls.md", "mob-new.md", "mob-resume.md", "mob-switch.md", "mob-remove.md",
 		"codemob-ls.md", "codemob-new.md", "codemob-resume.md", "codemob-switch.md", "codemob-remove.md",
@@ -166,6 +166,11 @@ func TestInit(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(commandsDir, name)); err != nil {
 			t.Errorf("slash command %s not installed: %v", name, err)
 		}
+	}
+
+	// then -> global gitignore should contain codemob command patterns
+	if !strings.Contains(string(data), "mob-*.md") {
+		t.Error("global gitignore does not contain mob-*.md pattern")
 	}
 }
 
