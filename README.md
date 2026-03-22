@@ -77,7 +77,11 @@ Swap the agent on the fly — go from Claude to Codex (or back) on the same work
 
   ● codemob  Switching mob 'wild-kumquat' to agent 'codex'
 
- codex                ~/my-project/.codemob/mobs/wild-kumquat
+╭──────────────────────────────────────────────────────╮
+│ >_ OpenAI Codex                                      │
+│                                                      │
+│ directory: ~/my-project/.codemob/mobs/wild-kumquat   │
+╰──────────────────────────────────────────────────────╯
 ```
 
 ## Install
