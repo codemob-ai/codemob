@@ -20,6 +20,9 @@ Start a new session — codemob creates an isolated workspace and drops you into
 Need another session? Create one without leaving Claude:
 
 ```
+ ▐▛███▜▌   Claude Code
+  ▘▘ ▝▝    ~/my-project/.codemob/mobs/wild-kumquat
+
 ❯ /codemob-new
 
 ⏺ Name or auto-generate? → auto
@@ -37,6 +40,9 @@ Need another session? Create one without leaving Claude:
 Switch between sessions — `/mob-switch`, pick one, exit, done:
 
 ```
+ ▐▛███▜▌   Claude Code
+  ▘▘ ▝▝    ~/my-project/.codemob/mobs/epic-apricot
+
 ❯ /mob-switch
 
 ⏺ #  NAME             LAST AGENT  CREATED
@@ -57,6 +63,9 @@ Switch between sessions — `/mob-switch`, pick one, exit, done:
 Swap the agent on the fly — go from Claude to Codex (or back) on the same workspace:
 
 ```
+ ▐▛███▜▌   Claude Code
+  ▘▘ ▝▝    ~/my-project/.codemob/mobs/wild-kumquat
+
 ❯ /mob-change-agent
 
 ⏺ codemob supports claude and codex. You're currently on claude.
