@@ -110,6 +110,9 @@ codemob init
 codemob --new                    # auto-generated name, default agent
 codemob --new brave-mango        # named mob
 codemob --new --agent codex      # pick agent
+claude --new-mob                 # shorthand, launches claude
+claude --new-mob brave-mango     # shorthand with name
+codex --new-mob                  # shorthand, launches codex
 
 # manage
 codemob --list                   # list mobs (with indices)
