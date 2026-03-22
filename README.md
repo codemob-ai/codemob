@@ -1,6 +1,6 @@
 ![codemob](img/banner.png)
 
-Manage isolated AI agent workspaces using git worktrees. No tmux, no terminal multiplexer, no special setup. Works in any terminal.
+Terminal-agnostic AI agent workspace manager. Isolated git worktrees, no tmux required.
 
 ```bash
 claude --new-mob                 # creates a worktree, launches claude in it
