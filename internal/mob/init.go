@@ -112,6 +112,7 @@ func Init(installDir string) error {
 	}
 	setupGlobalGitignore()
 	setupShellIntegration(installDir)
+	setupClaudePermissions()
 
 	fmt.Println()
 	fmt.Println("Repo setup:")
@@ -234,6 +235,66 @@ func setupShellIntegration(installDir string) {
 	f.WriteString("\n# codemob - AI agent workspace manager\n")
 	f.WriteString(sourceLine + "\n")
 	info(fmt.Sprintf("Added shell integration to %s", rcName))
+}
+
+var codemobPermissions = []string{
+	"Bash(codemob --list)",
+	"Bash(codemob --list-others)",
+	"Bash(codemob queue *)",
+	"Bash(codemob remove *)",
+}
+
+func setupClaudePermissions() {
+	settingsPath := filepath.Join(os.Getenv("HOME"), ".claude", "settings.json")
+
+	// Read existing settings or start fresh
+	var settings map[string]interface{}
+	data, err := os.ReadFile(settingsPath)
+	if err == nil {
+		json.Unmarshal(data, &settings)
+	}
+	if settings == nil {
+		settings = make(map[string]interface{})
+	}
+
+	// Get or create permissions.allow
+	perms, _ := settings["permissions"].(map[string]interface{})
+	if perms == nil {
+		perms = make(map[string]interface{})
+	}
+
+	allowList, _ := perms["allow"].([]interface{})
+
+	// Build set of existing permissions
+	existing := make(map[string]bool)
+	for _, p := range allowList {
+		if s, ok := p.(string); ok {
+			existing[s] = true
+		}
+	}
+
+	// Add missing codemob permissions
+	added := 0
+	for _, perm := range codemobPermissions {
+		if !existing[perm] {
+			allowList = append(allowList, perm)
+			added++
+		}
+	}
+
+	if added == 0 {
+		info("Claude permissions already configured for codemob")
+		return
+	}
+
+	perms["allow"] = allowList
+	settings["permissions"] = perms
+
+	os.MkdirAll(filepath.Dir(settingsPath), 0755)
+	out, _ := json.MarshalIndent(settings, "", "  ")
+	os.WriteFile(settingsPath, append(out, '\n'), 0644)
+
+	info("Added codemob permissions to Claude settings")
 }
 
 func setupClaudeCommands(repoRoot string) {
