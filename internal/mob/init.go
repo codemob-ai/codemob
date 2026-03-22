@@ -15,7 +15,7 @@ import (
 // slashCommandDefs defines the slash command content. Each is installed under both
 // "mob-*" and "codemob-*" names so either /mob-ls or /codemob-ls works.
 var slashCommandDefs = map[string]string{
-	"list": "List all codemob workspaces and their status.\n\nRun `codemob --list` using the Bash tool and display the results to the user.\n",
+	"list": "List all codemob workspaces and their status.\n\nRun exactly this command using the Bash tool: codemob --list\n\nDo NOT use go run, do NOT cd anywhere. Just run: codemob --list\n\nDisplay the output to the user.\n",
 	"new": `Create a new codemob workspace and copy the launch command to clipboard.
 
 Ask the user if they want to provide a name or have one auto-generated.
