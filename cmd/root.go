@@ -10,8 +10,8 @@ import (
 	"text/tabwriter"
 	"time"
 
-	gitutil "github.com/codemob-ai/codemob/internal/git"
-	"github.com/codemob-ai/codemob/internal/mob"
+	gitutil "github.com/codemob-ai/codemob-ai/internal/git"
+	"github.com/codemob-ai/codemob-ai/internal/mob"
 )
 
 func Execute() error {

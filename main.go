@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/codemob-ai/codemob/cmd"
+	"github.com/codemob-ai/codemob-ai/cmd"
 )
 
 func main() {

@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	gitutil "github.com/codemob-ai/codemob/internal/git"
+	gitutil "github.com/codemob-ai/codemob-ai/internal/git"
 )
 
 // slashCommandDefs defines the slash command content. Each is installed under both
