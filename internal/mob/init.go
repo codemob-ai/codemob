@@ -18,9 +18,12 @@ var slashCommandDefs = map[string]string{
 	"list": "List all codemob workspaces and their status.\n\nRun `codemob --list` using the Bash tool and display the results to the user.\n",
 	"new": `Create a new codemob workspace and copy the launch command to clipboard.
 
-Ask the user for a name for the new mob (or suggest generating one automatically).
+Ask the user if they want to provide a name or have one auto-generated.
 
-Once you have the name, copy the following command to the clipboard using ` + "`echo \"codemob --new <name>\" | pbcopy`" + ` (replace ` + "`<name>`" + ` with the actual name).
+If they provide a name, copy ` + "`echo \"codemob --new <name>\" | pbcopy`" + ` to clipboard (replace ` + "`<name>`" + ` with their choice).
+If they want auto-generated, copy ` + "`echo \"codemob --new\" | pbcopy`" + ` to clipboard (codemob generates a random name when none is provided).
+
+Do NOT generate a name yourself — codemob handles that.
 
 Then tell the user: "The command has been copied to your clipboard. Exit this session (Ctrl+C) and paste (Cmd+V) to create the new mob."
 `,
