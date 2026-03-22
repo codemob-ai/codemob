@@ -15,7 +15,7 @@ claude() {
     --list-mob|--list-mobs|--list-codemob|--list-codemobs) shift; codemob --list "$@" ;;
     *)
       command claude "$@"
-      codemob --check-next
+      codemob --check-queue
       ;;
   esac
 }
@@ -27,7 +27,7 @@ codex() {
     --list-mob|--list-mobs|--list-codemob|--list-codemobs) shift; codemob --list "$@" ;;
     *)
       command codex "$@"
-      codemob --check-next
+      codemob --check-queue
       ;;
   esac
 }

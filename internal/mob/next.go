@@ -6,37 +6,37 @@ import (
 	"path/filepath"
 )
 
-const nextFile = ".codemob/next.json"
+const queueFile = ".codemob/queue.json"
 
-// NextAction represents a pending action to execute after an agent exits.
-type NextAction struct {
-	Action string `json:"action"` // "switch", "new", etc.
-	Target string `json:"target"` // mob name for switch
+// QueuedAction represents a pending action to execute after an agent exits.
+type QueuedAction struct {
+	Action string `json:"action"` // "switch", "new", "remove"
+	Target string `json:"target"` // mob name (empty for auto-generated new)
 }
 
-// WriteNextAction writes an action for the trampoline to pick up.
-func WriteNextAction(repoRoot string, action NextAction) error {
+// WriteQueuedAction writes an action for the trampoline to pick up.
+func WriteQueuedAction(repoRoot string, action QueuedAction) error {
 	data, err := json.MarshalIndent(action, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(repoRoot, nextFile), append(data, '\n'), 0644)
+	return os.WriteFile(filepath.Join(repoRoot, queueFile), append(data, '\n'), 0644)
 }
 
-// ReadNextAction reads and returns the pending action, if any.
-func ReadNextAction(repoRoot string) (*NextAction, error) {
-	data, err := os.ReadFile(filepath.Join(repoRoot, nextFile))
+// ReadQueuedAction reads and returns the pending action, if any.
+func ReadQueuedAction(repoRoot string) (*QueuedAction, error) {
+	data, err := os.ReadFile(filepath.Join(repoRoot, queueFile))
 	if err != nil {
 		return nil, nil // no file = no action
 	}
-	var action NextAction
+	var action QueuedAction
 	if err := json.Unmarshal(data, &action); err != nil {
 		return nil, nil // corrupt file = no action
 	}
 	return &action, nil
 }
 
-// ClearNextAction removes the next action file.
-func ClearNextAction(repoRoot string) {
-	os.Remove(filepath.Join(repoRoot, nextFile))
+// ClearQueue removes the queued action file.
+func ClearQueue(repoRoot string) {
+	os.Remove(filepath.Join(repoRoot, queueFile))
 }

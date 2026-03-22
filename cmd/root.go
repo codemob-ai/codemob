@@ -15,10 +15,10 @@ import (
 )
 
 func Execute() error {
-	// Clear stale next action on every invocation (except --check-next which reads it)
-	if len(os.Args) < 2 || os.Args[1] != "--check-next" {
+	// Clear stale next action on every invocation (except --check-queue which reads it)
+	if len(os.Args) < 2 || os.Args[1] != "--check-queue" {
 		if root, err := mob.FindRepoRoot(); err == nil {
-			mob.ClearNextAction(root)
+			mob.ClearQueue(root)
 		}
 	}
 
@@ -40,7 +40,7 @@ func Execute() error {
 		return cmdList(args, true)
 	case "--resume", "--switch":
 		return cmdResume(args)
-	case "--check-next":
+	case "--check-queue":
 		return cmdCheckNext(args)
 
 	// Subcommands (management)
@@ -374,17 +374,17 @@ func cmdCheckNext(_ []string) error {
 		return nil // not in a repo, nothing to do
 	}
 
-	next, err := mob.ReadNextAction(root)
+	next, err := mob.ReadQueuedAction(root)
 	if err != nil || next == nil {
 		return nil // no queued action
 	}
-	mob.ClearNextAction(root)
+	mob.ClearQueue(root)
 
 	return executeNextAction(root, next)
 }
 
 // resolveNextAction resolves a next action to a workdir, agent, and resume flag.
-func resolveNextAction(root string, next *mob.NextAction) (workdir, agent string, resume bool, err error) {
+func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent string, resume bool, err error) {
 	cfg, err := mob.LoadConfig(root)
 	if err != nil {
 		return "", "", false, err
@@ -455,7 +455,7 @@ func resolveNextAction(root string, next *mob.NextAction) (workdir, agent string
 }
 
 // executeNextAction resolves and immediately launches the agent for a next action.
-func executeNextAction(root string, next *mob.NextAction) error {
+func executeNextAction(root string, next *mob.QueuedAction) error {
 	workdir, agent, resume, err := resolveNextAction(root, next)
 	if err != nil {
 		return err
@@ -493,7 +493,7 @@ func cmdWriteNext(args []string) error {
 	if len(args) >= 2 {
 		target = args[1]
 	}
-	return mob.WriteNextAction(root, mob.NextAction{
+	return mob.WriteQueuedAction(root, mob.QueuedAction{
 		Action: args[0],
 		Target: target,
 	})
@@ -508,11 +508,11 @@ func launchAgent(root, agent, workdir string, resume bool) error {
 		}
 
 		// Check for next action
-		next, err := mob.ReadNextAction(root)
+		next, err := mob.ReadQueuedAction(root)
 		if err != nil || next == nil {
 			return nil // normal exit
 		}
-		mob.ClearNextAction(root)
+		mob.ClearQueue(root)
 
 		newWorkdir, newAgent, newResume, err := resolveNextAction(root, next)
 		if err != nil {
