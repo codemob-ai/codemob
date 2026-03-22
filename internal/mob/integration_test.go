@@ -9,15 +9,15 @@ import (
 	"testing"
 )
 
-// buildCore builds the codemob-core binary and returns its path.
+// buildCore builds the codemob binary and returns its path.
 func buildCore(t *testing.T) string {
 	t.Helper()
-	bin := filepath.Join(t.TempDir(), "codemob-core")
+	bin := filepath.Join(t.TempDir(), "codemob")
 	cmd := exec.Command("go", "build", "-o", bin, ".")
 	cmd.Dir = repoRoot(t)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("failed to build codemob-core: %s\n%s", err, out)
+		t.Fatalf("failed to build codemob: %s\n%s", err, out)
 	}
 	return bin
 }
@@ -49,7 +49,7 @@ func setupTestRepo(t *testing.T) (string, string) {
 	return tmpHome, repoPath
 }
 
-// initRepo runs codemob-core init in the given repo, providing "main" as base branch input.
+// initRepo runs codemob init in the given repo, providing "main" as base branch input.
 func initRepo(t *testing.T, bin, repoPath string) {
 	t.Helper()
 	cmd := exec.Command(bin, "init")
@@ -73,26 +73,26 @@ func run(t *testing.T, dir string, name string, args ...string) string {
 	return string(out)
 }
 
-// runCore executes codemob-core with args in the given directory.
+// runCore executes codemob with args in the given directory.
 func runCore(t *testing.T, bin, dir string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command(bin, args...)
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("codemob-core %v failed: %s\n%s", args, err, out)
+		t.Fatalf("codemob %v failed: %s\n%s", args, err, out)
 	}
 	return string(out)
 }
 
-// runCoreExpectError executes codemob-core expecting failure.
+// runCoreExpectError executes codemob expecting failure.
 func runCoreExpectError(t *testing.T, bin, dir string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command(bin, args...)
 	cmd.Dir = dir
 	out, _ := cmd.CombinedOutput()
 	if cmd.ProcessState.ExitCode() == 0 {
-		t.Fatalf("expected codemob-core %v to fail, but it succeeded: %s", args, out)
+		t.Fatalf("expected codemob %v to fail, but it succeeded: %s", args, out)
 	}
 	return string(out)
 }
@@ -160,8 +160,8 @@ func TestInit(t *testing.T) {
 	// then -> slash commands should be installed in the project's .claude/commands/
 	commandsDir := filepath.Join(repoPath, ".claude", "commands")
 	for _, name := range []string{
-		"mob-ls.md", "mob-new.md", "mob-switch.md", "mob-remove.md",
-		"codemob-ls.md", "codemob-new.md", "codemob-switch.md", "codemob-remove.md",
+		"mob-list.md", "mob-new.md", "mob-switch.md", "mob-remove.md",
+		"codemob-list.md", "codemob-new.md", "codemob-switch.md", "codemob-remove.md",
 	} {
 		if _, err := os.Stat(filepath.Join(commandsDir, name)); err != nil {
 			t.Errorf("slash command %s not installed: %v", name, err)
@@ -197,18 +197,11 @@ func TestNewMob(t *testing.T) {
 	initRepo(t, bin, repoPath)
 
 	// when
-	out := runCore(t, bin, repoPath, "new", "test-feature", "--no-launch")
+	out := runCore(t, bin, repoPath, "--new", "test-feature", "--no-launch")
 
-	// then -> output should contain result vars
-	result := parseResult(out)
-	if result["CODEMOB_NAME"] != "test-feature" {
-		t.Errorf("expected name=test-feature, got %s", result["CODEMOB_NAME"])
-	}
-	if result["CODEMOB_BRANCH"] != "mob/test-feature" {
-		t.Errorf("expected branch=mob/test-feature, got %s", result["CODEMOB_BRANCH"])
-	}
-	if result["CODEMOB_AGENT"] != "claude" {
-		t.Errorf("expected agent=claude, got %s", result["CODEMOB_AGENT"])
+	// then -> output should confirm creation
+	if !strings.Contains(out, "test-feature") {
+		t.Errorf("expected output to mention 'test-feature', got: %s", out)
 	}
 
 	// then -> worktree should exist on disk
@@ -227,6 +220,12 @@ func TestNewMob(t *testing.T) {
 	if mob["name"] != "test-feature" {
 		t.Errorf("expected mob name=test-feature, got %v", mob["name"])
 	}
+	if mob["branch"] != "mob/test-feature" {
+		t.Errorf("expected branch=mob/test-feature, got %v", mob["branch"])
+	}
+	if mob["agent"] != "claude" {
+		t.Errorf("expected agent=claude, got %v", mob["agent"])
+	}
 }
 
 func TestNewMobAutoName(t *testing.T) {
@@ -235,15 +234,17 @@ func TestNewMobAutoName(t *testing.T) {
 	initRepo(t, bin, repoPath)
 
 	// when -> no name provided
-	out := runCore(t, bin, repoPath, "new", "--no-launch")
+	runCore(t, bin, repoPath, "--new", "--no-launch")
 
-	// then -> should generate a name
-	result := parseResult(out)
-	if result["CODEMOB_NAME"] == "" {
-		t.Error("expected auto-generated name, got empty")
+	// then -> config should have exactly one mob with a 6-char name
+	cfg := readConfig(t, repoPath)
+	mobs := cfg["mobs"].([]interface{})
+	if len(mobs) != 1 {
+		t.Fatalf("expected 1 mob, got %d", len(mobs))
 	}
-	if len(result["CODEMOB_NAME"]) != 6 {
-		t.Errorf("expected 6-char name, got %q", result["CODEMOB_NAME"])
+	name := mobs[0].(map[string]interface{})["name"].(string)
+	if len(name) != 6 {
+		t.Errorf("expected 6-char auto name, got %q", name)
 	}
 }
 
@@ -253,10 +254,10 @@ func TestNewMobDuplicateName(t *testing.T) {
 	initRepo(t, bin, repoPath)
 
 	// given -> create a mob
-	runCore(t, bin, repoPath, "new", "dupe-test", "--no-launch")
+	runCore(t, bin, repoPath, "--new", "dupe-test", "--no-launch")
 
 	// when -> try to create another with the same name
-	out := runCoreExpectError(t, bin, repoPath, "new", "dupe-test", "--no-launch")
+	out := runCoreExpectError(t, bin, repoPath, "--new", "dupe-test", "--no-launch")
 
 	// then
 	if !strings.Contains(out, "already exists") {
@@ -270,7 +271,7 @@ func TestListMobs(t *testing.T) {
 	initRepo(t, bin, repoPath)
 
 	// given -> no mobs
-	out := runCore(t, bin, repoPath, "list")
+	out := runCore(t, bin, repoPath, "--list")
 
 	// then
 	if !strings.Contains(out, "No mobs") {
@@ -278,11 +279,11 @@ func TestListMobs(t *testing.T) {
 	}
 
 	// given -> create two mobs
-	runCore(t, bin, repoPath, "new", "alpha", "--no-launch")
-	runCore(t, bin, repoPath, "new", "beta", "--no-launch")
+	runCore(t, bin, repoPath, "--new", "alpha", "--no-launch")
+	runCore(t, bin, repoPath, "--new", "beta", "--no-launch")
 
 	// when
-	out = runCore(t, bin, repoPath, "list")
+	out = runCore(t, bin, repoPath, "--list")
 
 	// then
 	if !strings.Contains(out, "alpha") {
@@ -296,36 +297,28 @@ func TestListMobs(t *testing.T) {
 	}
 }
 
-func TestResolveMob(t *testing.T) {
+func TestResumeMob(t *testing.T) {
 	bin := buildCore(t)
 	_, repoPath := setupTestRepo(t)
 	initRepo(t, bin, repoPath)
-	runCore(t, bin, repoPath, "new", "resolve-test", "--no-launch")
+	runCore(t, bin, repoPath, "--new", "resume-test", "--no-launch")
 
 	// when
-	out := runCore(t, bin, repoPath, "resolve", "resolve-test")
+	out := runCore(t, bin, repoPath, "--resume", "resume-test", "--no-launch")
 
-	// then
-	result := parseResult(out)
-	expectedPath := filepath.Join(repoPath, ".codemob", "mobs", "resolve-test")
-	// Resolve symlinks (macOS /var -> /private/var)
-	expectedPath, _ = filepath.EvalSymlinks(expectedPath)
-	gotPath, _ := filepath.EvalSymlinks(result["CODEMOB_PATH"])
-	if gotPath != expectedPath {
-		t.Errorf("expected path=%s, got %s", expectedPath, gotPath)
-	}
-	if result["CODEMOB_AGENT"] != "claude" {
-		t.Errorf("expected agent=claude, got %s", result["CODEMOB_AGENT"])
+	// then -> should mention the mob name
+	if !strings.Contains(out, "resume-test") {
+		t.Errorf("expected output to mention 'resume-test', got: %s", out)
 	}
 }
 
-func TestResolveNotFound(t *testing.T) {
+func TestResumeNotFound(t *testing.T) {
 	bin := buildCore(t)
 	_, repoPath := setupTestRepo(t)
 	initRepo(t, bin, repoPath)
 
 	// when
-	out := runCoreExpectError(t, bin, repoPath, "resolve", "nonexistent")
+	out := runCoreExpectError(t, bin, repoPath, "--resume", "nonexistent", "--no-launch")
 
 	// then
 	if !strings.Contains(out, "not found") {
@@ -337,7 +330,7 @@ func TestRemoveMob(t *testing.T) {
 	bin := buildCore(t)
 	_, repoPath := setupTestRepo(t)
 	initRepo(t, bin, repoPath)
-	runCore(t, bin, repoPath, "new", "remove-me", "--no-launch")
+	runCore(t, bin, repoPath, "--new", "remove-me", "--no-launch")
 
 	// when
 	out := runCore(t, bin, repoPath, "remove", "remove-me")
@@ -365,13 +358,13 @@ func TestReconciliation(t *testing.T) {
 	bin := buildCore(t)
 	_, repoPath := setupTestRepo(t)
 	initRepo(t, bin, repoPath)
-	runCore(t, bin, repoPath, "new", "orphan", "--no-launch")
+	runCore(t, bin, repoPath, "--new", "orphan", "--no-launch")
 
 	// given -> manually remove the worktree outside of codemob
 	run(t, repoPath, "git", "worktree", "remove", filepath.Join(".codemob", "mobs", "orphan"))
 
 	// when -> list (triggers reconciliation)
-	out := runCore(t, bin, repoPath, "list")
+	out := runCore(t, bin, repoPath, "--list")
 
 	// then -> orphan should be cleaned from config
 	if !strings.Contains(out, "No mobs") {
@@ -390,11 +383,11 @@ func TestRepoRootFromInsideWorktree(t *testing.T) {
 	bin := buildCore(t)
 	_, repoPath := setupTestRepo(t)
 	initRepo(t, bin, repoPath)
-	runCore(t, bin, repoPath, "new", "nested-test", "--no-launch")
+	runCore(t, bin, repoPath, "--new", "nested-test", "--no-launch")
 
 	// when -> run list from inside the mob worktree
 	worktreePath := filepath.Join(repoPath, ".codemob", "mobs", "nested-test")
-	out := runCore(t, bin, worktreePath, "list")
+	out := runCore(t, bin, worktreePath, "--list")
 
 	// then -> should work and show the mob
 	if !strings.Contains(out, "nested-test") {
@@ -408,7 +401,7 @@ func TestUninitializedRepo(t *testing.T) {
 	// do NOT run init
 
 	// when
-	out := runCoreExpectError(t, bin, repoPath, "list")
+	out := runCoreExpectError(t, bin, repoPath, "--list")
 
 	// then
 	if !strings.Contains(out, "not initialized") {
@@ -422,13 +415,7 @@ func TestNewMobWithCustomAgent(t *testing.T) {
 	initRepo(t, bin, repoPath)
 
 	// when
-	out := runCore(t, bin, repoPath, "new", "codex-mob", "--agent", "codex", "--no-launch")
-
-	// then
-	result := parseResult(out)
-	if result["CODEMOB_AGENT"] != "codex" {
-		t.Errorf("expected agent=codex, got %s", result["CODEMOB_AGENT"])
-	}
+	runCore(t, bin, repoPath, "--new", "codex-mob", "--agent", "codex", "--no-launch")
 
 	// then -> config should reflect the agent
 	cfg := readConfig(t, repoPath)

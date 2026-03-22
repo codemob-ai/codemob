@@ -15,9 +15,8 @@ Key ideas:
 ## Architecture
 
 Two layers:
-- **`codemob.sh`** (bash) — sourced into shell via `.zshrc`. Defines `codemob`/`mob`/`claude` functions. Thin layer: parses flags, calls `codemob-core`, handles `cd` + agent launch.
-- **`codemob-core`** (Go binary) — all logic: config management, git operations, reconciliation, JSON. Outputs `KEY=VALUE` lines for the bash layer to consume.
-- **`init.sh`** (bash) — standalone setup script for global + repo initialization.
+- **`codemob`** (Go binary) — all logic: config management, git operations, reconciliation, JSON. Launches agents via `syscall.Exec` after `os.Chdir` into the worktree.
+- **`codemob-shell.sh`** (bash) — sourced into shell via `.zshrc`. Defines `mob` alias and `claude`/`codex` wrappers that intercept `--*-mob`/`--*-codemob` flags. No logic — just aliases.
 
 ## CLI interface
 
@@ -45,24 +44,22 @@ claude --resume-mob <name>  # → codemob --resume <name>
 ## Build
 
 ```bash
-go build -o codemob-core .   # build the Go brain
+go build -o codemob .   # build the binary
 ```
 
-No build step needed for `codemob.sh` or `init.sh` — they're plain bash.
+No build step needed for `codemob-shell.sh` — it's plain bash.
 
 ## Project structure
 
 ```
-codemob.sh              # bash shell functions (sourced into .zshrc)
-codemob-core            # Go binary (build artifact, gitignored)
-init.sh                 # standalone setup script
+codemob-shell.sh        # optional bash aliases (sourced into .zshrc)
+codemob                 # Go binary (build artifact, gitignored)
 main.go                 # Go entry point
 cmd/
   root.go               # command dispatch + all core commands
 internal/
   git/git.go            # git command wrappers
   mob/mob.go            # data model, config, reconciliation
-claude-commands/        # Claude Code slash commands (/mob-ls, /mob-new, etc.)
 ```
 
 ## Data model
@@ -85,4 +82,4 @@ claude-commands/        # Claude Code slash commands (/mob-ls, /mob-new, etc.)
 
 ## Core/shell interface
 
-The Go binary outputs `CODEMOB_KEY=value` lines. The bash layer parses these to get paths, agent names, etc., then handles shell-level operations (cd, launching agents). This separation means the Go binary never touches the shell and is replaceable.
+The Go binary is the primary interface — it handles everything including agent launching (via `os.Chdir` + `syscall.Exec`). The shell script is an optional enhancement that provides `mob` alias and `claude --new-mob` / `codex --new-mob` wrappers.

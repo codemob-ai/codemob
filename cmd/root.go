@@ -3,7 +3,9 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"syscall"
 	"text/tabwriter"
 	"time"
 
@@ -21,25 +23,38 @@ func Execute() error {
 	args := os.Args[2:]
 
 	switch cmd {
-	case "init":
+	// Flags (core workflow)
+	case "--new":
+		return cmdNew(args)
+	case "--list", "--ls":
+		return cmdList(args)
+	case "--resume", "--switch":
+		return cmdResume(args)
+
+	// Subcommands (management)
+	case "init", "reinit":
 		return cmdInit(args)
 	case "uninstall":
 		return cmdUninstall(args)
+	case "remove":
+		return cmdRemove(args)
+
+	// Internal (used by shell wrapper)
 	case "new":
 		return cmdNew(args)
 	case "list":
 		return cmdList(args)
 	case "resolve":
 		return cmdResolve(args)
-	case "remove":
-		return cmdRemove(args)
-	case "detect-branch":
-		return cmdDetectBranch(args)
-	case "version":
-		fmt.Println("codemob-core v0.1.0")
+
+	case "--version", "-v", "version":
+		fmt.Println("codemob v0.1.0")
+		return nil
+	case "--help", "-h", "help":
+		printUsage()
 		return nil
 	default:
-		return fmt.Errorf("unknown command: %s", cmd)
+		return fmt.Errorf("unknown command: %s. Run 'codemob --help' for usage.", cmd)
 	}
 }
 
@@ -53,7 +68,6 @@ func cmdUninstall(_ []string) error {
 }
 
 func cmdInit(_ []string) error {
-	// Determine install dir from the binary's own location
 	exe, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("could not determine install directory: %w", err)
@@ -132,21 +146,19 @@ func cmdNew(args []string) error {
 		return err
 	}
 
-	// Output for codemob.sh
-	fmt.Printf("CODEMOB_PATH=%s\n", worktreePath)
-	fmt.Printf("CODEMOB_AGENT=%s\n", agent)
-	fmt.Printf("CODEMOB_NAME=%s\n", name)
-	fmt.Printf("CODEMOB_BRANCH=%s\n", branch)
-	fmt.Printf("CODEMOB_NO_LAUNCH=%t\n", noLaunch)
+	fmt.Printf("Created mob '%s' on branch %s\n", name, branch)
+
+	if !noLaunch {
+		return launchAgent(agent, worktreePath, false)
+	}
 	return nil
 }
 
 func cmdList(_ []string) error {
-	root, cfg, err := requireInit()
+	_, cfg, err := requireInit()
 	if err != nil {
 		return err
 	}
-	_ = root
 
 	if len(cfg.Mobs) == 0 {
 		fmt.Println("No mobs. Create one with: codemob --new <name>")
@@ -162,6 +174,45 @@ func cmdList(_ []string) error {
 	return nil
 }
 
+func cmdResume(args []string) error {
+	root, cfg, err := requireInit()
+	if err != nil {
+		return err
+	}
+
+	name := ""
+	noLaunch := false
+	for _, arg := range args {
+		switch arg {
+		case "--no-launch":
+			noLaunch = true
+		default:
+			if name == "" {
+				name = arg
+			}
+		}
+	}
+
+	if name == "" {
+		return fmt.Errorf("mob name required")
+	}
+
+	m := mob.FindMob(cfg, name)
+	if m == nil {
+		return fmt.Errorf("mob '%s' not found", name)
+	}
+
+	worktreePath := filepath.Join(root, mob.MobsDir, m.Name)
+	fmt.Printf("Resuming mob '%s'\n", m.Name)
+
+	if !noLaunch {
+		return launchAgent(m.Agent, worktreePath, true)
+	}
+	return nil
+}
+
+// cmdResolve is the internal command used by the shell wrapper.
+// Outputs KEY=VALUE lines for the shell to parse.
 func cmdResolve(args []string) error {
 	root, cfg, err := requireInit()
 	if err != nil {
@@ -222,7 +273,6 @@ func cmdRemove(args []string) error {
 
 	_ = gitutil.BranchDelete(root, m.Branch)
 
-	// Remove from config
 	var remaining []mob.Mob
 	for _, existing := range cfg.Mobs {
 		if existing.Name != name {
@@ -252,14 +302,65 @@ func cmdDetectBranch(_ []string) error {
 	return nil
 }
 
+// launchAgent replaces the current process with the agent in the given directory.
+func launchAgent(agent, workdir string, resume bool) error {
+	var agentBin string
+	var agentArgs []string
+
+	switch agent {
+	case "claude":
+		agentBin = "claude"
+		if resume {
+			agentArgs = []string{"claude", "--continue"}
+		} else {
+			agentArgs = []string{"claude"}
+		}
+	case "codex":
+		agentBin = "codex"
+		if resume {
+			agentArgs = []string{"codex", "resume", "--last"}
+		} else {
+			agentArgs = []string{"codex"}
+		}
+	default:
+		return fmt.Errorf("unknown agent: %s", agent)
+	}
+
+	// Find the agent binary on PATH
+	binPath, err := exec.LookPath(agentBin)
+	if err != nil {
+		return fmt.Errorf("agent '%s' not found on PATH", agentBin)
+	}
+
+	// Change to worktree directory and exec the agent
+	if err := os.Chdir(workdir); err != nil {
+		return fmt.Errorf("could not change to worktree: %w", err)
+	}
+
+	return syscall.Exec(binPath, agentArgs, os.Environ())
+}
+
 func printUsage() {
-	fmt.Println("codemob-core — internal logic for codemob")
+	fmt.Println("codemob — AI agent workspace manager")
 	fmt.Println("")
-	fmt.Println("Commands:")
-	fmt.Println("  new [name] [--no-launch] [--agent <name>]")
-	fmt.Println("  list")
-	fmt.Println("  resolve <name>")
-	fmt.Println("  remove <name> [--force]")
-	fmt.Println("  detect-branch")
-	fmt.Println("  version")
+	fmt.Println("Usage: codemob <command>")
+	fmt.Println("")
+	fmt.Println("Workflow:")
+	fmt.Println("  --new [name]       Create a new mob and launch agent")
+	fmt.Println("  --list             List all mobs")
+	fmt.Println("  --resume <name>    Resume a mob (launch agent in worktree)")
+	fmt.Println("  --switch <name>    Alias for --resume")
+	fmt.Println("")
+	fmt.Println("Management:")
+	fmt.Println("  init               Initialize codemob (global + repo setup)")
+	fmt.Println("  reinit             Re-run initialization (idempotent)")
+	fmt.Println("  remove <name>      Remove a mob")
+	fmt.Println("  uninstall          Remove all codemob setup")
+	fmt.Println("")
+	fmt.Println("Options:")
+	fmt.Println("  --no-launch        Skip launching the agent")
+	fmt.Println("  --agent <name>     Override agent (default: from config)")
+	fmt.Println("  --force            Force remove")
+	fmt.Println("  --help             Show this help")
+	fmt.Println("  --version          Show version")
 }

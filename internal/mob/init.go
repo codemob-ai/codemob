@@ -15,7 +15,7 @@ import (
 // slashCommandDefs defines the slash command content. Each is installed under both
 // "mob-*" and "codemob-*" names so either /mob-ls or /codemob-ls works.
 var slashCommandDefs = map[string]string{
-	"ls": "List all codemob workspaces and their status.\n\nRun `codemob --list` using the Bash tool and display the results to the user.\n",
+	"list": "List all codemob workspaces and their status.\n\nRun `codemob --list` using the Bash tool and display the results to the user.\n",
 	"new": `Create a new codemob workspace and copy the launch command to clipboard.
 
 Ask the user for a name for the new mob (or suggest generating one automatically).
@@ -66,7 +66,7 @@ func warn(msg string)  { fmt.Printf("%s!%s %s\n", yellow, reset, msg) }
 func errMsg(msg string) { fmt.Fprintf(os.Stderr, "%s✗%s %s\n", red, reset, msg) }
 
 // Init performs the full codemob initialization.
-// installDir is the directory where codemob.sh lives.
+// installDir is the directory where codemob-shell.sh lives.
 func Init(installDir string) error {
 	fmt.Println("codemob init")
 	fmt.Println("────────────")
@@ -164,16 +164,16 @@ func detectShellRC() (string, string) {
 
 func setupShellIntegration(installDir string) {
 	rcFile, rcName := detectShellRC()
-	sourceLine := fmt.Sprintf(`source "%s/codemob.sh"`, installDir)
+	sourceLine := fmt.Sprintf(`source "%s/codemob-shell.sh"`, installDir)
 
 	// Check if any codemob source line exists
-	if fileContains(rcFile, "codemob.sh") {
-		existing := fileLineContaining(rcFile, "codemob.sh")
+	if fileContains(rcFile, "codemob-shell.sh") {
+		existing := fileLineContaining(rcFile, "codemob-shell.sh")
 		if existing == sourceLine {
 			info(fmt.Sprintf("Shell integration already configured in %s", rcName))
 			return
 		}
-		replaceLineInFile(rcFile, "codemob.sh", sourceLine)
+		replaceLineInFile(rcFile, "codemob-shell.sh", sourceLine)
 		info(fmt.Sprintf("Updated codemob source path in %s", rcName))
 		return
 	}
