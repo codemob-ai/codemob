@@ -146,16 +146,24 @@ mob() {
   codemob "$@"
 }
 
-# Claude wrapper — intercepts --new-mob / --resume-mob, passthrough otherwise
+# Claude wrapper — intercepts codemob flags, passthrough otherwise
 claude() {
   case "${1:-}" in
-    --new-mob)
+    --new-mob|--new-codemob)
       shift
       codemob --new "$@"
       ;;
-    --resume-mob)
+    --resume-mob|--resume-codemob)
       shift
       codemob --resume "$@"
+      ;;
+    --switch-mob|--switch-codemob)
+      shift
+      codemob --switch "$@"
+      ;;
+    --list-mob|--list-mobs|--list-codemob)
+      shift
+      codemob --list "$@"
       ;;
     *)
       command claude "$@"
