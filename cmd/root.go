@@ -399,6 +399,26 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 		fmt.Printf("Switching to mob '%s'\n", m.Name)
 		return filepath.Join(root, mob.MobsDir, m.Name), m.Agent, true, nil
 
+	case "switch-agent":
+		// Same mob, different agent. Detect current mob from cwd.
+		currentName := mob.CurrentMobName()
+		if currentName == "" {
+			return "", "", false, fmt.Errorf("not inside a mob worktree")
+		}
+		m := mob.FindMob(cfg, currentName)
+		if m == nil {
+			return "", "", false, fmt.Errorf("mob '%s' not found", currentName)
+		}
+		newAgent := next.Target
+		if newAgent == "" {
+			return "", "", false, fmt.Errorf("agent name required")
+		}
+		// Update the mob's agent in config
+		m.Agent = newAgent
+		_ = mob.SaveConfig(root, cfg)
+		fmt.Printf("Switching mob '%s' to agent '%s'\n", m.Name, newAgent)
+		return filepath.Join(root, mob.MobsDir, m.Name), newAgent, false, nil
+
 	case "new":
 		name := next.Target
 		if name == "" {
