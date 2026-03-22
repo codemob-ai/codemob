@@ -507,6 +507,13 @@ func executeNextAction(root string, next *mob.QueuedAction) error {
 
 // cmdWriteNext writes a next action for the trampoline.
 // Used by slash commands: codemob queue switch <mob-name>
+var validQueueActions = map[string]bool{
+	"switch":       true,
+	"new":          true,
+	"remove":       true,
+	"change-agent": true,
+}
+
 func cmdWriteNext(args []string) error {
 	if len(args) < 1 {
 		return fmt.Errorf("usage: codemob queue <action> [target]")
@@ -516,6 +523,9 @@ func cmdWriteNext(args []string) error {
 		return err
 	}
 	action := args[0]
+	if !validQueueActions[action] {
+		return fmt.Errorf("unknown queue action: %s", action)
+	}
 	target := ""
 	if len(args) >= 2 {
 		target = args[1]

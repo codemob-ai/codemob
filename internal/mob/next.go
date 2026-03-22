@@ -2,9 +2,17 @@ package mob
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 )
+
+var validActions = map[string]bool{
+	"switch":       true,
+	"new":          true,
+	"remove":       true,
+	"change-agent": true,
+}
 
 const queueFile = ".codemob/queue.json"
 
@@ -32,7 +40,10 @@ func ReadQueuedAction(repoRoot string) (*QueuedAction, error) {
 	}
 	var action QueuedAction
 	if err := json.Unmarshal(data, &action); err != nil {
-		return nil, nil // corrupt file = no action
+		return nil, fmt.Errorf("corrupt queue file: %w", err)
+	}
+	if !validActions[action.Action] {
+		return nil, fmt.Errorf("unknown queued action: %s", action.Action)
 	}
 	return &action, nil
 }
