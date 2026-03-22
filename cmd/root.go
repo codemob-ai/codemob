@@ -400,10 +400,9 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 		return filepath.Join(root, mob.MobsDir, m.Name), m.Agent, true, nil
 
 	case "switch-agent":
-		// Same mob, different agent. Detect current mob from cwd.
-		currentName := mob.CurrentMobName()
+		currentName := next.Mob
 		if currentName == "" {
-			return "", "", false, fmt.Errorf("not inside a mob worktree")
+			return "", "", false, fmt.Errorf("could not determine current mob")
 		}
 		m := mob.FindMob(cfg, currentName)
 		if m == nil {
@@ -509,14 +508,20 @@ func cmdWriteNext(args []string) error {
 	if err != nil {
 		return err
 	}
+	action := args[0]
 	target := ""
 	if len(args) >= 2 {
 		target = args[1]
 	}
-	return mob.WriteQueuedAction(root, mob.QueuedAction{
-		Action: args[0],
-		Target: target,
-	})
+
+	q := mob.QueuedAction{Action: action, Target: target}
+
+	// For switch-agent, record which mob we're in right now
+	if action == "switch-agent" {
+		q.Mob = mob.CurrentMobName()
+	}
+
+	return mob.WriteQueuedAction(root, q)
 }
 
 // launchAgent spawns the agent as a child process and implements the trampoline loop.

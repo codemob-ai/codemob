@@ -10,8 +10,9 @@ const queueFile = ".codemob/queue.json"
 
 // QueuedAction represents a pending action to execute after an agent exits.
 type QueuedAction struct {
-	Action string `json:"action"` // "switch", "new", "remove"
-	Target string `json:"target"` // mob name (empty for auto-generated new)
+	Action string `json:"action"`          // "switch", "new", "remove", "switch-agent"
+	Target string `json:"target"`          // mob name, agent name, etc.
+	Mob    string `json:"mob,omitempty"`   // current mob name (for switch-agent)
 }
 
 // WriteQueuedAction writes an action for the trampoline to pick up.
