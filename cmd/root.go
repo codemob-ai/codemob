@@ -23,6 +23,8 @@ func Execute() error {
 	switch cmd {
 	case "init":
 		return cmdInit(args)
+	case "uninstall":
+		return cmdUninstall(args)
 	case "new":
 		return cmdNew(args)
 	case "list":
@@ -39,6 +41,15 @@ func Execute() error {
 	default:
 		return fmt.Errorf("unknown command: %s", cmd)
 	}
+}
+
+func cmdUninstall(_ []string) error {
+	exe, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("could not determine install directory: %w", err)
+	}
+	installDir := filepath.Dir(exe)
+	return mob.Uninstall(installDir)
 }
 
 func cmdInit(_ []string) error {

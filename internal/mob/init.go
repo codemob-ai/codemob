@@ -271,6 +271,123 @@ func setupRepo() string {
 	return root
 }
 
+// ─── Uninstall ────────────────────────────────────────────────────────────────
+
+// Uninstall removes all codemob setup — global and local.
+func Uninstall(installDir string) error {
+	fmt.Println("codemob uninstall")
+	fmt.Println("─────────────────")
+	fmt.Println()
+	warn("This will:")
+	fmt.Println("  - Remove shell integration (codemob/mob/claude functions) from your shell RC file")
+	fmt.Println("  - Remove codemob entries from global gitignore")
+
+	// Check if we're in a codemob project
+	repoRoot, _ := gitutil.RepoRoot()
+	hasProject := repoRoot != "" && IsInitialized(repoRoot)
+	if hasProject {
+		fmt.Printf("  - Remove .codemob/ directory and all worktrees from %s\n", repoRoot)
+		fmt.Println("  - Remove codemob slash commands from .claude/commands/")
+	}
+
+	fmt.Println()
+	warn("codemob will stop working in ALL projects after this.")
+	fmt.Println()
+	fmt.Print("Are you sure? [y/N]: ")
+
+	reader := bufio.NewReader(os.Stdin)
+	input, _ := reader.ReadString('\n')
+	input = strings.TrimSpace(strings.ToLower(input))
+	if input != "y" && input != "yes" {
+		fmt.Println("Cancelled.")
+		return nil
+	}
+
+	fmt.Println()
+
+	// Remove local project data
+	if hasProject {
+		// Remove all worktrees first (git worktree remove)
+		cfg, err := LoadConfig(repoRoot)
+		if err == nil {
+			for _, m := range cfg.Mobs {
+				worktreePath := filepath.Join(repoRoot, MobsDir, m.Name)
+				_ = gitutil.WorktreeRemove(repoRoot, worktreePath, true)
+				_ = gitutil.BranchDelete(repoRoot, m.Branch)
+			}
+		}
+		// Remove .codemob/ directory
+		os.RemoveAll(filepath.Join(repoRoot, CodemobDir))
+		info("Removed .codemob/ and all worktrees")
+
+		// Remove slash commands from project
+		for name := range SlashCommands() {
+			os.Remove(filepath.Join(repoRoot, ".claude", "commands", name))
+		}
+		info("Removed codemob slash commands from .claude/commands/")
+	}
+
+	// Remove shell integration
+	rcFile, rcName := detectShellRC()
+	if removeLinesFromFile(rcFile, "codemob") {
+		info(fmt.Sprintf("Removed codemob lines from %s", rcName))
+	} else {
+		info(fmt.Sprintf("No codemob lines found in %s", rcName))
+	}
+
+	// Remove from global gitignore
+	gitignoreFile := ""
+	out, err := exec.Command("git", "config", "--global", "core.excludesFile").Output()
+	if err == nil {
+		gitignoreFile = strings.TrimSpace(string(out))
+	}
+	if gitignoreFile == "" {
+		gitignoreFile = filepath.Join(os.Getenv("HOME"), ".config", "git", "ignore")
+	} else if strings.HasPrefix(gitignoreFile, "~") {
+		gitignoreFile = filepath.Join(os.Getenv("HOME"), gitignoreFile[1:])
+	}
+
+	if removeLinesFromFile(gitignoreFile, "codemob") {
+		info("Removed codemob entries from global gitignore")
+	} else {
+		info("No codemob entries found in global gitignore")
+	}
+
+	fmt.Println()
+	info("Uninstalled. Open a new terminal for changes to take effect.")
+	return nil
+}
+
+// removeLinesFromFile removes all lines containing substr from a file.
+// Returns true if any lines were removed.
+func removeLinesFromFile(path, substr string) bool {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+
+	lines := strings.Split(string(data), "\n")
+	var kept []string
+	removed := false
+
+	for _, line := range lines {
+		if strings.Contains(line, substr) {
+			removed = true
+			// Also skip preceding blank line
+			if len(kept) > 0 && strings.TrimSpace(kept[len(kept)-1]) == "" {
+				kept = kept[:len(kept)-1]
+			}
+			continue
+		}
+		kept = append(kept, line)
+	}
+
+	if removed {
+		os.WriteFile(path, []byte(strings.Join(kept, "\n")), 0644)
+	}
+	return removed
+}
+
 // ─── File helpers ─────────────────────────────────────────────────────────────
 
 func fileContains(path, substr string) bool {

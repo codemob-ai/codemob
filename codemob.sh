@@ -108,6 +108,11 @@ codemob() {
       _codemob_core remove "$@"
       ;;
 
+    uninstall)
+      shift
+      _codemob_core uninstall "$@"
+      ;;
+
     --version|-v)
       echo "codemob v0.1.0"
       ;;
@@ -125,6 +130,7 @@ codemob() {
       echo "  init               Initialize codemob (global + repo setup)"
       echo "  reinit             Re-run initialization (idempotent)"
       echo "  remove <name>      Remove a mob"
+      echo "  uninstall          Remove all codemob setup (global + local)"
       echo ""
       echo "Options:"
       echo "  --no-launch        Skip launching the agent"
