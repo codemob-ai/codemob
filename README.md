@@ -5,7 +5,7 @@ Powered by git worktrees under the hood, but you don't need to know that.
 
 Start a new session — codemob creates an isolated workspace and drops you into Claude:
 
-```
+```bash
 ~/my-project
 ❯ claude --new-mob
 
@@ -20,7 +20,7 @@ Start a new session — codemob creates an isolated workspace and drops you into
 
 Need another session? Create one without leaving Claude:
 
-```
+```bash
  ▐▛███▜▌   Claude Code
 ▝▜█████▛▘
   ▘▘ ▝▝    ~/my-project/.codemob/mobs/wild-kumquat
@@ -42,7 +42,7 @@ Need another session? Create one without leaving Claude:
 
 Switch between sessions — `/mob-switch`, pick one, exit, done:
 
-```
+```bash
  ▐▛███▜▌   Claude Code
 ▝▜█████▛▘
   ▘▘ ▝▝    ~/my-project/.codemob/mobs/epic-apricot
@@ -67,7 +67,7 @@ Switch between sessions — `/mob-switch`, pick one, exit, done:
 
 Swap the agent on the fly — go from Claude to Codex (or back) on the same workspace:
 
-```
+```bash
  ▐▛███▜▌   Claude Code
 ▝▜█████▛▘
   ▘▘ ▝▝    ~/my-project/.codemob/mobs/wild-kumquat
