@@ -162,9 +162,20 @@ func detectShellRC() (string, string) {
 	}
 }
 
+func findShellScript(binDir string) string {
+	// Standard install: <prefix>/bin/codemob → <prefix>/share/codemob/codemob-shell.sh
+	shareDir := filepath.Join(filepath.Dir(binDir), "share", "codemob", "codemob-shell.sh")
+	if _, err := os.Stat(shareDir); err == nil {
+		return shareDir
+	}
+	// Fallback: shell script next to binary
+	return filepath.Join(binDir, "codemob-shell.sh")
+}
+
 func setupShellIntegration(installDir string) {
 	rcFile, rcName := detectShellRC()
-	sourceLine := fmt.Sprintf(`source "%s/codemob-shell.sh"`, installDir)
+	shellScript := findShellScript(installDir)
+	sourceLine := fmt.Sprintf(`source "%s"`, shellScript)
 
 	// Check if any codemob source line exists
 	if fileContains(rcFile, "codemob-shell.sh") {
