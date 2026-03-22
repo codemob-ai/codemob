@@ -32,7 +32,7 @@ Switching to mob 'epic-apricot'
 Swap the agent on the current session — go from Codex to Claude (or back):
 
 ```
-❯ /mob-switch-agent
+❯ /mob-change-agent
   Which agent? → claude
 
 ⏺ Agent switch queued. Exit (Ctrl+C).
@@ -76,7 +76,7 @@ codemob clear                    # remove all
 | `/mob-list` | List mobs |
 | `/mob-new` | Create mob (launches after exit) |
 | `/mob-switch` | Switch mob (launches after exit) |
-| `/mob-switch-agent` | Swap agent (claude <-> codex) |
+| `/mob-change-agent` | Swap agent (claude <-> codex) |
 | `/mob-remove` | Remove mob |
 
 Also available as `/codemob-*`.

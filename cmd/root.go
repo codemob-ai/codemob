@@ -402,7 +402,7 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 		fmt.Printf("Switching to mob '%s'\n", m.Name)
 		return filepath.Join(root, mob.MobsDir, m.Name), m.Agent, true, nil
 
-	case "switch-agent":
+	case "change-agent":
 		currentName := next.Mob
 		if currentName == "" {
 			return "", "", false, fmt.Errorf("could not determine current mob")
@@ -519,8 +519,8 @@ func cmdWriteNext(args []string) error {
 
 	q := mob.QueuedAction{Action: action, Target: target}
 
-	// For switch-agent, record which mob we're in right now
-	if action == "switch-agent" {
+	// For change-agent, record which mob we're in right now
+	if action == "change-agent" {
 		q.Mob = mob.CurrentMobName()
 	}
 

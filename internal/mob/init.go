@@ -47,11 +47,11 @@ Once they pick one, run ` + "`codemob queue switch <name>`" + ` using the Bash t
 Then tell the user: "Switch queued. Exit this session (Ctrl+C) and codemob will automatically launch the new mob."
 `,
 	},
-	"switch-agent": {
+	"change-agent": {
 		Description: "Switch the current mob to a different AI agent",
 		Body: `Ask the user which agent they want to switch to (claude, codex, etc.).
 
-Once they pick one, run ` + "`codemob queue switch-agent <agent>`" + ` using the Bash tool (replace ` + "`<agent>`" + ` with the chosen agent name).
+Once they pick one, run ` + "`codemob queue change-agent <agent>`" + ` using the Bash tool (replace ` + "`<agent>`" + ` with the chosen agent name).
 
 Then tell the user: "Agent switch queued. Exit this session (Ctrl+C) and codemob will relaunch with the new agent."
 `,
