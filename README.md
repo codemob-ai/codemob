@@ -8,15 +8,20 @@ Start a new session — codemob creates an isolated workspace and drops you into
 ```
 ~/my-project
 ❯ claude --new-mob
-Created mob 'wild-kumquat' on branch mob/wild-kumquat
+
+  ● codemob  Created mob 'wild-kumquat' on branch mob/wild-kumquat
+
  ▐▛███▜▌   Claude Code
   ▘▘ ▝▝    ~/my-project/.codemob/mobs/wild-kumquat
+
+❯ help me refactor the auth module
 ```
 
-Switch to another session from inside Claude — just `/mob-switch`, pick one, exit:
+Switch to another session from inside Claude — `/mob-switch`, pick one, exit, done:
 
 ```
 ❯ /mob-switch
+
 ⏺ #  NAME             LAST AGENT  CREATED
   1  brave-mango      claude      2h ago
   2  epic-apricot     codex       30m ago
@@ -25,19 +30,27 @@ Switch to another session from inside Claude — just `/mob-switch`, pick one, e
 
 ⏺ Switch queued. Exit (Ctrl+C) and codemob launches the next session.
 
-Switching to mob 'epic-apricot'
+❯ Ctrl+C
+
+  ● codemob  Switching to mob 'epic-apricot'
+
  codex                ~/my-project/.codemob/mobs/epic-apricot
 ```
 
-Swap the agent on the current session — go from Codex to Claude (or back):
+Swap the agent on the fly — go from Codex to Claude (or back) on the same workspace:
 
 ```
 ❯ /mob-change-agent
-  Which agent? → claude
+
+⏺ codemob supports claude and codex. You're currently on codex.
+  Switch to claude? → yes
 
 ⏺ Agent switch queued. Exit (Ctrl+C).
 
-Switching mob 'epic-apricot' to agent 'claude'
+❯ Ctrl+C
+
+  ● codemob  Switching mob 'epic-apricot' to agent 'claude'
+
  ▐▛███▜▌   Claude Code
   ▘▘ ▝▝    ~/my-project/.codemob/mobs/epic-apricot
 ```
