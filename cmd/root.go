@@ -45,6 +45,8 @@ func Execute() error {
 		return cmdUninstall(args)
 	case "remove":
 		return cmdRemove(args)
+	case "clear":
+		return cmdClear(args)
 
 	// Internal
 	case "new":
@@ -310,6 +312,45 @@ func cmdRemove(args []string) error {
 	return nil
 }
 
+func cmdClear(_ []string) error {
+	root, cfg, err := requireInit()
+	if err != nil {
+		return err
+	}
+
+	if len(cfg.Mobs) == 0 {
+		fmt.Println("No mobs to clear.")
+		return nil
+	}
+
+	fmt.Printf("This will remove all %d mob(s) and their worktrees.\n", len(cfg.Mobs))
+	fmt.Print("Are you sure? [y/N]: ")
+
+	var input string
+	fmt.Scanln(&input)
+	if input != "y" && input != "yes" {
+		fmt.Println("Cancelled.")
+		return nil
+	}
+
+	for _, m := range cfg.Mobs {
+		worktreePath := filepath.Join(root, mob.MobsDir, m.Name)
+		if _, err := os.Stat(worktreePath); err == nil {
+			_ = gitutil.WorktreeRemove(root, worktreePath, true)
+		}
+		_ = gitutil.BranchDelete(root, m.Branch)
+		fmt.Printf("  Removed '%s'\n", m.Name)
+	}
+
+	cfg.Mobs = nil
+	if err := mob.SaveConfig(root, cfg); err != nil {
+		return err
+	}
+
+	fmt.Println("All mobs cleared.")
+	return nil
+}
+
 func cmdDetectBranch(_ []string) error {
 	root, err := mob.FindRepoRoot()
 	if err != nil {
@@ -450,6 +491,7 @@ func printUsage() {
 	fmt.Println("  init               Initialize codemob (global + repo setup)")
 	fmt.Println("  reinit             Re-run initialization (idempotent)")
 	fmt.Println("  remove <name>      Remove a mob")
+	fmt.Println("  clear              Remove all mobs")
 	fmt.Println("  uninstall          Remove all codemob setup")
 	fmt.Println("")
 	fmt.Println("Options:")
