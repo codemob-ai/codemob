@@ -70,6 +70,17 @@ const (
 	reset  = "\033[0m"
 )
 
+func printBanner() {
+	fmt.Println(` ________  ________  ________  _______   _____ ______   ________  ________     `)
+	fmt.Println(`|\   ____\|\   __  \|\   ___ \|\  ___ \ |\   _ \  _   \|\   __  \|\   __  \    `)
+	fmt.Println(`\ \  \___|\ \  \|\  \ \  \_|\ \ \   __/|\ \  \\\__\ \  \ \  \|\  \ \  \|\ /_   `)
+	fmt.Println(` \ \  \    \ \  \\\  \ \  \ \\ \ \  \_|/_\ \  \\|__| \  \ \  \\\  \ \   __  \  `)
+	fmt.Println(`  \ \  \____\ \  \\\  \ \  \_\\ \ \  \_|\ \ \  \    \ \  \ \  \\\  \ \  \|\  \ `)
+	fmt.Println(`   \ \_______\ \_______\ \_______\ \_______\ \__\    \ \__\ \_______\ \_______\`)
+	fmt.Println(`    \|_______|\|_______|\|_______|\|_______|\|__|     \|__|\|_______|\|_______|`)
+	fmt.Println()
+}
+
 func info(msg string)  { fmt.Printf("%s✓%s %s\n", green, reset, msg) }
 func warn(msg string)  { fmt.Printf("%s!%s %s\n", yellow, reset, msg) }
 func errMsg(msg string) { fmt.Fprintf(os.Stderr, "%s✗%s %s\n", red, reset, msg) }
@@ -77,6 +88,7 @@ func errMsg(msg string) { fmt.Fprintf(os.Stderr, "%s✗%s %s\n", red, reset, msg
 // Init performs the full codemob initialization.
 // installDir is the directory where codemob-shell.sh lives.
 func Init(installDir string) error {
+	printBanner()
 	fmt.Println("codemob init")
 	fmt.Println("────────────")
 	fmt.Println()
@@ -291,6 +303,7 @@ func setupRepo() string {
 
 // Uninstall removes all codemob setup — global and local.
 func Uninstall(installDir string) error {
+	printBanner()
 	fmt.Println("codemob uninstall")
 	fmt.Println("─────────────────")
 	fmt.Println()
