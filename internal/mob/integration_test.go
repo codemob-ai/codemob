@@ -236,15 +236,15 @@ func TestNewMobAutoName(t *testing.T) {
 	// when -> no name provided
 	runCore(t, bin, repoPath, "--new", "--no-launch")
 
-	// then -> config should have exactly one mob with a 6-char name
+	// then -> config should have exactly one mob with an adjective-fruit name
 	cfg := readConfig(t, repoPath)
 	mobs := cfg["mobs"].([]interface{})
 	if len(mobs) != 1 {
 		t.Fatalf("expected 1 mob, got %d", len(mobs))
 	}
 	name := mobs[0].(map[string]interface{})["name"].(string)
-	if len(name) != 6 {
-		t.Errorf("expected 6-char auto name, got %q", name)
+	if !strings.Contains(name, "-") {
+		t.Errorf("expected adjective-fruit name, got %q", name)
 	}
 }
 

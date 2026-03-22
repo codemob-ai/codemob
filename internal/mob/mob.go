@@ -3,7 +3,6 @@ package mob
 import (
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
@@ -100,15 +99,6 @@ func FindMob(cfg *Config, name string) *Mob {
 	return nil
 }
 
-// GenerateName creates a random 6-char slug.
-func GenerateName() string {
-	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
-	b := make([]byte, 6)
-	for i := range b {
-		b[i] = chars[rand.Intn(len(chars))]
-	}
-	return string(b)
-}
 
 // RelativeTime formats a timestamp as a human-readable relative time.
 func RelativeTime(timestamp string) string {
