@@ -149,8 +149,9 @@ func setupGlobalGitignore() {
 
 	if gitignoreFile == "" {
 		gitignoreFile = filepath.Join(os.Getenv("HOME"), ".config", "git", "ignore")
+		// Tell git about it
+		exec.Command("git", "config", "--global", "core.excludesFile", gitignoreFile).Run()
 	} else {
-		// Expand ~ if present
 		if strings.HasPrefix(gitignoreFile, "~") {
 			gitignoreFile = filepath.Join(os.Getenv("HOME"), gitignoreFile[1:])
 		}
