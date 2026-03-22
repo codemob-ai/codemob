@@ -16,22 +16,22 @@ import (
 // "mob-*" and "codemob-*" names so either /mob-ls or /codemob-ls works.
 var slashCommandDefs = map[string]string{
 	"list": "List all codemob workspaces and their status.\n\nRun exactly this command using the Bash tool: codemob --list\n\nDo NOT use go run, do NOT cd anywhere. Just run: codemob --list\n\nDisplay the output to the user.\n",
-	"new": `Create a new codemob workspace and copy the launch command to clipboard.
+	"new": `Create a new codemob workspace.
 
 Ask the user if they want to provide a name or have one auto-generated.
 
-If they provide a name, copy ` + "`echo \"codemob --new <name>\" | pbcopy`" + ` to clipboard (replace ` + "`<name>`" + ` with their choice).
-If they want auto-generated, copy ` + "`echo \"codemob --new\" | pbcopy`" + ` to clipboard (codemob generates a random name when none is provided).
+If they provide a name, run: ` + "`codemob write-next new <name>`" + ` (replace ` + "`<name>`" + ` with their choice).
+If they want auto-generated, run: ` + "`codemob write-next new`" + ` (no name argument — codemob generates one).
 
-Do NOT generate a name yourself — codemob handles that.
+Do NOT generate a name yourself — codemob handles name generation.
 
-Then tell the user: "The command has been copied to your clipboard. Exit this session (Ctrl+C) and paste (Cmd+V) to create the new mob."
+Then tell the user: "New mob queued. Exit this session (Ctrl+C) and codemob will automatically create and launch the new mob."
 `,
 	"switch": `Switch to a different codemob workspace.
 
 Run ` + "`codemob --list-others`" + ` using the Bash tool.
 
-If the output says "No mobs", tell the user there are no other mobs to switch to and suggest using /mob-new to create one.
+If the output says "No mobs", tell the user there are no other mobs to switch to and suggest using /mob-new or /codemob-new to create one.
 
 Otherwise, display the results and ask the user which mob they want to switch to.
 

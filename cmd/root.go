@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"text/tabwriter"
 	"time"
 
@@ -80,6 +81,18 @@ func cmdUninstall(_ []string) error {
 	}
 	installDir := filepath.Dir(exe)
 	return mob.Uninstall(installDir)
+}
+
+// resolveMob finds a mob by name or 1-based index.
+func resolveMob(cfg *mob.Config, nameOrIndex string) *mob.Mob {
+	// Try as index first
+	if idx, err := strconv.Atoi(nameOrIndex); err == nil {
+		if idx >= 1 && idx <= len(cfg.Mobs) {
+			return &cfg.Mobs[idx-1]
+		}
+	}
+	// Fall back to name
+	return mob.FindMob(cfg, nameOrIndex)
 }
 
 func cmdInit(_ []string) error {
@@ -193,7 +206,7 @@ func cmdList(_ []string, excludeCurrent bool) error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "#\tNAME\tBRANCH\tAGENT\tCREATED")
+	fmt.Fprintln(w, "#\tNAME\tBRANCH\tLAST AGENT\tCREATED")
 	for i, m := range mobs {
 		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", i+1, m.Name, m.Branch, m.Agent, mob.RelativeTime(m.CreatedAt))
 	}
@@ -224,7 +237,7 @@ func cmdResume(args []string) error {
 		return fmt.Errorf("mob name required")
 	}
 
-	m := mob.FindMob(cfg, name)
+	m := resolveMob(cfg, name)
 	if m == nil {
 		return fmt.Errorf("mob '%s' not found", name)
 	}
@@ -251,7 +264,7 @@ func cmdResolve(args []string) error {
 	}
 	name := args[0]
 
-	m := mob.FindMob(cfg, name)
+	m := resolveMob(cfg, name)
 	if m == nil {
 		return fmt.Errorf("mob '%s' not found", name)
 	}
@@ -286,7 +299,7 @@ func cmdRemove(args []string) error {
 		return fmt.Errorf("mob name required")
 	}
 
-	m := mob.FindMob(cfg, name)
+	m := resolveMob(cfg, name)
 	if m == nil {
 		return fmt.Errorf("mob '%s' not found", name)
 	}
@@ -367,22 +380,62 @@ func cmdCheckNext(_ []string) error {
 	}
 	mob.ClearNextAction(root)
 
+	return executeNextAction(root, next)
+}
+
+// resolveNextAction resolves a next action to a workdir, agent, and resume flag.
+func resolveNextAction(root string, next *mob.NextAction) (workdir, agent string, resume bool, err error) {
+	cfg, err := mob.LoadConfig(root)
+	if err != nil {
+		return "", "", false, err
+	}
+
 	switch next.Action {
 	case "switch":
-		cfg, err := mob.LoadConfig(root)
-		if err != nil {
-			return err
-		}
 		m := mob.FindMob(cfg, next.Target)
 		if m == nil {
-			return fmt.Errorf("mob '%s' not found", next.Target)
+			return "", "", false, fmt.Errorf("mob '%s' not found", next.Target)
 		}
-		worktreePath := filepath.Join(root, mob.MobsDir, m.Name)
 		fmt.Printf("Switching to mob '%s'\n", m.Name)
-		return launchAgent(root, m.Agent, worktreePath, true)
+		return filepath.Join(root, mob.MobsDir, m.Name), m.Agent, true, nil
+
+	case "new":
+		name := next.Target
+		if name == "" {
+			name = mob.GenerateName()
+		}
+		branch := "mob/" + name
+		worktreePath := filepath.Join(root, mob.MobsDir, name)
+
+		if err := gitutil.WorktreeAdd(root, worktreePath, branch, cfg.BaseBranch); err != nil {
+			return "", "", false, err
+		}
+
+		cfg.Mobs = append(cfg.Mobs, mob.Mob{
+			Name:      name,
+			Branch:    branch,
+			CreatedAt: time.Now().UTC().Format(time.RFC3339),
+			Agent:     cfg.DefaultAgent,
+		})
+		if err := mob.SaveConfig(root, cfg); err != nil {
+			return "", "", false, err
+		}
+
+		fmt.Printf("Created mob '%s' on branch %s\n", name, branch)
+		return worktreePath, cfg.DefaultAgent, false, nil
+
 	default:
-		return fmt.Errorf("unknown next action: %s", next.Action)
+		return "", "", false, fmt.Errorf("unknown next action: %s", next.Action)
 	}
+}
+
+// executeNextAction resolves and immediately launches the agent for a next action.
+func executeNextAction(root string, next *mob.NextAction) error {
+	workdir, agent, resume, err := resolveNextAction(root, next)
+	if err != nil {
+		return err
+	}
+	return launchAgent(root, agent, workdir, resume)
 }
 
 func cmdDetectBranch(_ []string) error {
@@ -401,16 +454,20 @@ func cmdDetectBranch(_ []string) error {
 // cmdWriteNext writes a next action for the trampoline.
 // Used by slash commands: codemob write-next switch <mob-name>
 func cmdWriteNext(args []string) error {
-	if len(args) < 2 {
-		return fmt.Errorf("usage: codemob write-next <action> <target>")
+	if len(args) < 1 {
+		return fmt.Errorf("usage: codemob write-next <action> [target]")
 	}
 	root, err := mob.FindRepoRoot()
 	if err != nil {
 		return err
 	}
+	target := ""
+	if len(args) >= 2 {
+		target = args[1]
+	}
 	return mob.WriteNextAction(root, mob.NextAction{
 		Action: args[0],
-		Target: args[1],
+		Target: target,
 	})
 }
 
@@ -429,23 +486,13 @@ func launchAgent(root, agent, workdir string, resume bool) error {
 		}
 		mob.ClearNextAction(root)
 
-		switch next.Action {
-		case "switch":
-			cfg, err := mob.LoadConfig(root)
-			if err != nil {
-				return err
-			}
-			m := mob.FindMob(cfg, next.Target)
-			if m == nil {
-				return fmt.Errorf("mob '%s' not found", next.Target)
-			}
-			workdir = filepath.Join(root, mob.MobsDir, m.Name)
-			agent = m.Agent
-			resume = true
-			fmt.Printf("Switching to mob '%s'\n", m.Name)
-		default:
-			return fmt.Errorf("unknown next action: %s", next.Action)
+		newWorkdir, newAgent, newResume, err := resolveNextAction(root, next)
+		if err != nil {
+			return err
 		}
+		workdir = newWorkdir
+		agent = newAgent
+		resume = newResume
 	}
 }
 
