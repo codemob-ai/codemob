@@ -160,8 +160,8 @@ func TestInit(t *testing.T) {
 	// then -> slash commands should be installed in the project's .claude/commands/
 	commandsDir := filepath.Join(repoPath, ".claude", "commands")
 	for _, name := range []string{
-		"mob-ls.md", "mob-new.md", "mob-resume.md", "mob-switch.md", "mob-remove.md",
-		"codemob-ls.md", "codemob-new.md", "codemob-resume.md", "codemob-switch.md", "codemob-remove.md",
+		"mob-ls.md", "mob-new.md", "mob-switch.md", "mob-remove.md",
+		"codemob-ls.md", "codemob-new.md", "codemob-switch.md", "codemob-remove.md",
 	} {
 		if _, err := os.Stat(filepath.Join(commandsDir, name)); err != nil {
 			t.Errorf("slash command %s not installed: %v", name, err)

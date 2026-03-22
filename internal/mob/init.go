@@ -24,16 +24,6 @@ Once you have the name, copy the following command to the clipboard using ` + "`
 
 Then tell the user: "The command has been copied to your clipboard. Exit this session (Ctrl+C) and paste (Cmd+V) to create the new mob."
 `,
-	"resume": `Resume an existing codemob workspace and copy the launch command to clipboard.
-
-Run ` + "`codemob --list`" + ` using the Bash tool and display the results to the user.
-
-Ask the user which mob they want to resume.
-
-Once they pick one, copy the following command to the clipboard using ` + "`echo \"codemob --resume <name>\" | pbcopy`" + ` (replace ` + "`<name>`" + ` with the chosen mob name).
-
-Then tell the user: "The command has been copied to your clipboard. Exit this session (Ctrl+C) and paste (Cmd+V) to resume the mob."
-`,
 	"switch": `Switch to a different codemob workspace and copy the launch command to clipboard.
 
 Run ` + "`codemob --list`" + ` using the Bash tool and display the results to the user.
@@ -46,11 +36,11 @@ Then tell the user: "The command has been copied to your clipboard. Exit this se
 `,
 	"remove": `Remove a codemob workspace (worktree + branch).
 
-Run ` + "`codemob --list`" + ` using the Bash tool and display the results to the user.
+First, check if the current working directory is inside a codemob mob worktree by checking if the path contains ` + "`.codemob/mobs/`" + `. If it does, extract the mob name from the path and ask the user to confirm removing THIS mob (the one they're currently working in).
 
-Ask the user which mob they want to remove.
+If not inside a mob worktree, run ` + "`codemob --list`" + ` using the Bash tool, display the results, and ask which mob to remove.
 
-Once they confirm, run ` + "`codemob remove <name>`" + ` using the Bash tool (replace ` + "`<name>`" + ` with the chosen mob name) and display the result.
+Once confirmed, run ` + "`codemob remove <name>`" + ` using the Bash tool and display the result.
 `,
 }
 
