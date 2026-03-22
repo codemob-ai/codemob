@@ -161,7 +161,7 @@ claude() {
       shift
       codemob --switch "$@"
       ;;
-    --list-mob|--list-mobs|--list-codemob)
+    --list-mob|--list-mobs|--list-codemob|--list-codemobs)
       shift
       codemob --list "$@"
       ;;
