@@ -107,9 +107,8 @@ codemob init
 
 ```bash
 # start
-claude --new-mob                 # new mob + claude
-codex --new-mob                  # new mob + codex
-codemob --new brave-mango        # named mob, default agent
+codemob --new                    # auto-generated name, default agent
+codemob --new brave-mango        # named mob
 codemob --new --agent codex      # pick agent
 
 # manage
@@ -119,6 +118,8 @@ codemob --resume 2               # resume by index
 codemob remove brave-mango       # remove one
 codemob clear                    # remove all
 ```
+
+Shell aliases (`claude --new-mob`, `codex --new-mob`, `mob --new`) also work after `codemob init`.
 
 ### Inside Claude Code / Codex
 
