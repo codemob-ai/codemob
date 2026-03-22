@@ -60,7 +60,7 @@ func Execute() error {
 		return cmdList(args, false)
 	case "resolve":
 		return cmdResolve(args)
-	case "write-next":
+	case "queue":
 		return cmdWriteNext(args)
 
 	case "--version", "-v", "version":
@@ -424,6 +424,31 @@ func resolveNextAction(root string, next *mob.NextAction) (workdir, agent string
 		fmt.Printf("Created mob '%s' on branch %s\n", name, branch)
 		return worktreePath, cfg.DefaultAgent, false, nil
 
+	case "remove":
+		name := next.Target
+		if name == "" {
+			return "", "", false, fmt.Errorf("mob name required for remove")
+		}
+		m := mob.FindMob(cfg, name)
+		if m == nil {
+			return "", "", false, fmt.Errorf("mob '%s' not found", name)
+		}
+		worktreePath := filepath.Join(root, mob.MobsDir, m.Name)
+		if _, statErr := os.Stat(worktreePath); statErr == nil {
+			_ = gitutil.WorktreeRemove(root, worktreePath, true)
+		}
+		_ = gitutil.BranchDelete(root, m.Branch)
+		var remaining []mob.Mob
+		for _, existing := range cfg.Mobs {
+			if existing.Name != name {
+				remaining = append(remaining, existing)
+			}
+		}
+		cfg.Mobs = remaining
+		_ = mob.SaveConfig(root, cfg)
+		fmt.Printf("Removed mob '%s'\n", name)
+		return "", "", false, nil // no agent to launch
+
 	default:
 		return "", "", false, fmt.Errorf("unknown next action: %s", next.Action)
 	}
@@ -434,6 +459,9 @@ func executeNextAction(root string, next *mob.NextAction) error {
 	workdir, agent, resume, err := resolveNextAction(root, next)
 	if err != nil {
 		return err
+	}
+	if workdir == "" {
+		return nil // action completed, no agent to launch (e.g., remove)
 	}
 	return launchAgent(root, agent, workdir, resume)
 }
@@ -452,10 +480,10 @@ func cmdDetectBranch(_ []string) error {
 }
 
 // cmdWriteNext writes a next action for the trampoline.
-// Used by slash commands: codemob write-next switch <mob-name>
+// Used by slash commands: codemob queue switch <mob-name>
 func cmdWriteNext(args []string) error {
 	if len(args) < 1 {
-		return fmt.Errorf("usage: codemob write-next <action> [target]")
+		return fmt.Errorf("usage: codemob queue <action> [target]")
 	}
 	root, err := mob.FindRepoRoot()
 	if err != nil {
@@ -489,6 +517,9 @@ func launchAgent(root, agent, workdir string, resume bool) error {
 		newWorkdir, newAgent, newResume, err := resolveNextAction(root, next)
 		if err != nil {
 			return err
+		}
+		if newWorkdir == "" {
+			return nil // action completed, no agent to launch (e.g., remove)
 		}
 		workdir = newWorkdir
 		agent = newAgent

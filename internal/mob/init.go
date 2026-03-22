@@ -20,8 +20,8 @@ var slashCommandDefs = map[string]string{
 
 Ask the user if they want to provide a name or have one auto-generated.
 
-If they provide a name, run: ` + "`codemob write-next new <name>`" + ` (replace ` + "`<name>`" + ` with their choice).
-If they want auto-generated, run: ` + "`codemob write-next new`" + ` (no name argument — codemob generates one).
+If they provide a name, run: ` + "`codemob queue new <name>`" + ` (replace ` + "`<name>`" + ` with their choice).
+If they want auto-generated, run: ` + "`codemob queue new`" + ` (no name argument — codemob generates one).
 
 Do NOT generate a name yourself — codemob handles name generation.
 
@@ -35,17 +35,21 @@ If the output says "No mobs", tell the user there are no other mobs to switch to
 
 Otherwise, display the results and ask the user which mob they want to switch to.
 
-Once they pick one, run ` + "`codemob write-next switch <name>`" + ` using the Bash tool (replace ` + "`<name>`" + ` with the chosen mob name).
+Once they pick one, run ` + "`codemob queue switch <name>`" + ` using the Bash tool (replace ` + "`<name>`" + ` with the chosen mob name).
 
 Then tell the user: "Switch queued. Exit this session (Ctrl+C) and codemob will automatically launch the new mob."
 `,
 	"remove": `Remove a codemob workspace (worktree + branch).
 
-First, check if the current working directory is inside a codemob mob worktree by checking if the path contains ` + "`.codemob/mobs/`" + `. If it does, extract the mob name from the path and ask the user to confirm removing THIS mob (the one they're currently working in).
+Run ` + "`codemob --list`" + ` using the Bash tool and display the results.
 
-If not inside a mob worktree, run ` + "`codemob --list`" + ` using the Bash tool, display the results, and ask which mob to remove.
+Determine the current mob by checking if the working directory contains ` + "`.codemob/mobs/`" + ` — if so, extract the mob name from the path.
 
-Once confirmed, run ` + "`codemob remove <name>`" + ` using the Bash tool and display the result.
+Ask the user which mob they want to remove.
+
+If they choose a DIFFERENT mob (not the current one), run ` + "`codemob remove <name>`" + ` directly.
+
+If they choose the CURRENT mob, run ` + "`codemob queue remove <name>`" + ` and tell them: "Removal queued. Exit this session (Ctrl+C) and codemob will remove the mob."
 `,
 }
 
