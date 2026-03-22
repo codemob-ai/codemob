@@ -531,11 +531,9 @@ func cmdWriteNext(args []string) error {
 // After the agent exits, it checks for a next action (e.g., switch to another mob).
 func launchAgent(root, agent, workdir string, resume bool) error {
 	for {
-		if err := runAgent(agent, workdir, resume); err != nil {
-			return err
-		}
+		_ = runAgent(agent, workdir, resume)
 
-		// Check for next action
+		// Always check for queued action, regardless of how the agent exited
 		next, err := mob.ReadQueuedAction(root)
 		if err != nil || next == nil {
 			return nil // normal exit
