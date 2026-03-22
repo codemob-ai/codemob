@@ -12,6 +12,7 @@ Start a new session — codemob creates an isolated workspace and drops you into
   ● codemob  Created mob 'wild-kumquat' on branch mob/wild-kumquat
 
  ▐▛███▜▌   Claude Code
+▝▜█████▛▘
   ▘▘ ▝▝    ~/my-project/.codemob/mobs/wild-kumquat
 
 ❯ help me refactor the auth module
@@ -21,6 +22,7 @@ Need another session? Create one without leaving Claude:
 
 ```
  ▐▛███▜▌   Claude Code
+▝▜█████▛▘
   ▘▘ ▝▝    ~/my-project/.codemob/mobs/wild-kumquat
 
 ❯ /codemob-new
@@ -34,6 +36,7 @@ Need another session? Create one without leaving Claude:
   ● codemob  Created mob 'epic-apricot' on branch mob/epic-apricot
 
  ▐▛███▜▌   Claude Code
+▝▜█████▛▘
   ▘▘ ▝▝    ~/my-project/.codemob/mobs/epic-apricot
 ```
 
@@ -41,6 +44,7 @@ Switch between sessions — `/mob-switch`, pick one, exit, done:
 
 ```
  ▐▛███▜▌   Claude Code
+▝▜█████▛▘
   ▘▘ ▝▝    ~/my-project/.codemob/mobs/epic-apricot
 
 ❯ /mob-switch
@@ -57,6 +61,7 @@ Switch between sessions — `/mob-switch`, pick one, exit, done:
   ● codemob  Switching to mob 'wild-kumquat'
 
  ▐▛███▜▌   Claude Code
+▝▜█████▛▘
   ▘▘ ▝▝    ~/my-project/.codemob/mobs/wild-kumquat
 ```
 
@@ -64,6 +69,7 @@ Swap the agent on the fly — go from Claude to Codex (or back) on the same work
 
 ```
  ▐▛███▜▌   Claude Code
+▝▜█████▛▘
   ▘▘ ▝▝    ~/my-project/.codemob/mobs/wild-kumquat
 
 ❯ /mob-change-agent
@@ -86,11 +92,12 @@ Swap the agent on the fly — go from Claude to Codex (or back) on the same work
 
 ## Install
 
+Homebrew tap is WIP. For now, build from source:
+
 ```bash
 git clone https://github.com/codemob-ai/codemob.git
 cd codemob
-go build -o codemob .
-# put the binary on your PATH, then:
+make install    # builds and copies to /opt/homebrew
 codemob init
 ```
 
