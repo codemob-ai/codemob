@@ -193,9 +193,9 @@ func cmdList(_ []string, excludeCurrent bool) error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tBRANCH\tAGENT\tCREATED")
-	for _, m := range mobs {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", m.Name, m.Branch, m.Agent, mob.RelativeTime(m.CreatedAt))
+	fmt.Fprintln(w, "#\tNAME\tBRANCH\tAGENT\tCREATED")
+	for i, m := range mobs {
+		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", i+1, m.Name, m.Branch, m.Agent, mob.RelativeTime(m.CreatedAt))
 	}
 	w.Flush()
 	return nil
