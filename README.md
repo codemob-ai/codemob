@@ -1,43 +1,14 @@
 ![codemob](img/banner.png)
 
-Run parallel AI coding sessions in isolated git worktrees. Works transparently with Claude Code and Codex — just use them like you normally would.
-
-## The problem
-
-You're working with Claude Code on a feature. You need to start a second task in the same repo without losing context. You could manually create a git worktree, cd into it, launch another claude session... or:
+Manage isolated AI agent workspaces using git worktrees. No tmux, no terminal multiplexer, no special setup. Works in any terminal.
 
 ```bash
-claude --new-mob
+claude --new-mob                 # creates a worktree, launches claude in it
+codex --new-mob                  # same, but with codex
+codemob --list                   # see what's running
 ```
 
-That's it. codemob creates an isolated worktree, launches Claude Code inside it, and manages everything. Same for Codex:
-
-```bash
-codex --new-mob
-```
-
-## Switch between sessions — even from inside Claude
-
-You're deep in a Claude session and want to jump to another mob. Just run `/mob-switch`, pick one, exit Claude. codemob automatically launches the new session:
-
-```
-❯ /mob-switch
-
-⏺ Here are your other mobs:
-
-  #  NAME             AGENT   CREATED
-  1  wild-kumquat     claude  2h ago
-  2  epic-apricot     codex   30m ago
-
-  Which mob would you like to switch to?
-
-❯ 1
-
-⏺ Switch queued. Exit this session (Ctrl+C) and codemob will
-  automatically launch the new mob.
-```
-
-Switch agents mid-session with `/mob-switch-agent` — go from Claude to Codex (or back) on the same worktree.
+Switch between sessions from inside Claude using `/mob-switch`. Switch agents mid-session with `/mob-switch-agent`.
 
 ## Install
 
@@ -49,56 +20,47 @@ go build -o codemob .
 codemob init
 ```
 
-`codemob init` handles everything: shell integration, gitignore, Claude Code slash commands, permissions.
-
 ## Usage
 
-### Start sessions
-
 ```bash
+# start
 claude --new-mob                 # new mob + claude
 codex --new-mob                  # new mob + codex
-claude --new-mob brave-mango     # with a specific name
-codemob --new                    # auto-generated name
-codemob --new --agent codex      # pick agent explicitly
-```
+codemob --new brave-mango        # named mob, default agent
+codemob --new --agent codex      # pick agent
 
-### Manage mobs
-
-```bash
-codemob --list                   # list all mobs
+# manage
+codemob --list                   # list mobs (with indices)
 codemob --resume brave-mango     # resume by name
 codemob --resume 2               # resume by index
-codemob remove brave-mango       # remove a mob
-codemob clear                    # remove all mobs
+codemob remove brave-mango       # remove one
+codemob clear                    # remove all
 ```
 
-### From inside Claude Code / Codex
+### Inside Claude Code / Codex
 
-Slash commands (installed automatically by `codemob init`):
-
-| Command | What it does |
+| Command | |
 |---|---|
-| `/mob-list` | List all mobs |
-| `/mob-new` | Create a new mob (launches after exit) |
-| `/mob-switch` | Switch to another mob (launches after exit) |
-| `/mob-switch-agent` | Swap agent mid-session (e.g., claude to codex) |
-| `/mob-remove` | Remove a mob |
+| `/mob-list` | List mobs |
+| `/mob-new` | Create mob (launches after exit) |
+| `/mob-switch` | Switch mob (launches after exit) |
+| `/mob-switch-agent` | Swap agent (claude <-> codex) |
+| `/mob-remove` | Remove mob |
 
-All commands also work with `/codemob-` prefix.
+Also available as `/codemob-*`.
 
 ## How it works
 
-Each mob is a git worktree under `.codemob/mobs/`. codemob manages the lifecycle and launches agents as child processes using a trampoline pattern — when you queue a switch from inside an agent, codemob picks it up after the agent exits and launches the next session automatically.
+Each mob is a git worktree under `.codemob/mobs/`. Agents are launched as child processes. When you queue a switch from inside an agent (via slash command), codemob picks it up after exit and launches the next session.
 
-Git is the source of truth. If you manually delete a worktree, codemob cleans up its metadata on the next operation.
+Git is the source of truth. Stale metadata gets cleaned up automatically.
 
 ## Development
 
 ```bash
-make build          # build the binary
-make install        # dev install (emulates Homebrew layout)
-make test           # run integration tests
+make build
+make install        # dev install to /opt/homebrew
+make test
 ```
 
 ## License
