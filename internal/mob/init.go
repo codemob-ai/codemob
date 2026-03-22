@@ -94,9 +94,15 @@ func Init(installDir string) error {
 	repoRoot := setupRepo()
 	setupClaudeCommands(repoRoot)
 
-	_, rcName := detectShellRC()
+	rcFile, rcName := detectShellRC()
 	fmt.Println()
-	info(fmt.Sprintf("Done! Open a new terminal or run: source %s", rcName))
+	fmt.Println("────────────────────────────────────────────────────────")
+	warn("codemob won't work until you reload your shell!")
+	fmt.Println()
+	fmt.Println("  Either open a new terminal, or run:")
+	fmt.Printf("  source %s\n", rcName)
+	fmt.Println("────────────────────────────────────────────────────────")
+	_ = rcFile
 	return nil
 }
 
