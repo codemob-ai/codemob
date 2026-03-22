@@ -100,7 +100,7 @@ codemob() {
 
     init|reinit)
       shift
-      bash "$CODEMOB_INSTALL_DIR/init.sh" "$@"
+      _codemob_core init "$@"
       ;;
 
     remove)

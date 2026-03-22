@@ -21,6 +21,8 @@ func Execute() error {
 	args := os.Args[2:]
 
 	switch cmd {
+	case "init":
+		return cmdInit(args)
 	case "new":
 		return cmdNew(args)
 	case "list":
@@ -37,6 +39,16 @@ func Execute() error {
 	default:
 		return fmt.Errorf("unknown command: %s", cmd)
 	}
+}
+
+func cmdInit(_ []string) error {
+	// Determine install dir from the binary's own location
+	exe, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("could not determine install directory: %w", err)
+	}
+	installDir := filepath.Dir(exe)
+	return mob.Init(installDir)
 }
 
 func requireInit() (string, *mob.Config, error) {

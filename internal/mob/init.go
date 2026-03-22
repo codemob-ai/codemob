@@ -1,0 +1,286 @@
+package mob
+
+import (
+	"bufio"
+	"encoding/json"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+
+	gitutil "github.com/codemob-ai/codemob/internal/git"
+)
+
+// SlashCommands contains the Claude Code slash command definitions.
+// Embedded here so the binary is self-contained.
+var SlashCommands = map[string]string{
+	"mob-ls.md": "Run `codemob --list` using the Bash tool and display the results to the user.\n",
+	"mob-new.md": `Ask the user for a name for the new mob (or suggest generating one automatically).
+
+Once you have the name, copy the following command to the clipboard using ` + "`echo \"codemob --new <name>\" | pbcopy`" + ` (replace ` + "`<name>`" + ` with the actual name).
+
+Then tell the user: "The command has been copied to your clipboard. Exit this session (Ctrl+C) and paste (Cmd+V) to create the new mob."
+`,
+	"mob-resume.md": `Run ` + "`codemob --list`" + ` using the Bash tool and display the results to the user.
+
+Ask the user which mob they want to resume.
+
+Once they pick one, copy the following command to the clipboard using ` + "`echo \"codemob --resume <name>\" | pbcopy`" + ` (replace ` + "`<name>`" + ` with the chosen mob name).
+
+Then tell the user: "The command has been copied to your clipboard. Exit this session (Ctrl+C) and paste (Cmd+V) to resume the mob."
+`,
+	"mob-switch.md": `Run ` + "`codemob --list`" + ` using the Bash tool and display the results to the user.
+
+Ask the user which mob they want to switch to.
+
+Once they pick one, copy the following command to the clipboard using ` + "`echo \"codemob --switch <name>\" | pbcopy`" + ` (replace ` + "`<name>`" + ` with the chosen mob name).
+
+Then tell the user: "The command has been copied to your clipboard. Exit this session (Ctrl+C) and paste (Cmd+V) to switch to the mob."
+`,
+	"mob-remove.md": `Run ` + "`codemob --list`" + ` using the Bash tool and display the results to the user.
+
+Ask the user which mob they want to remove.
+
+Once they confirm, run ` + "`codemob remove <name>`" + ` using the Bash tool (replace ` + "`<name>`" + ` with the chosen mob name) and display the result.
+`,
+}
+
+const (
+	green  = "\033[0;32m"
+	yellow = "\033[0;33m"
+	red    = "\033[0;31m"
+	reset  = "\033[0m"
+)
+
+func info(msg string)  { fmt.Printf("%s✓%s %s\n", green, reset, msg) }
+func warn(msg string)  { fmt.Printf("%s!%s %s\n", yellow, reset, msg) }
+func errMsg(msg string) { fmt.Fprintf(os.Stderr, "%s✗%s %s\n", red, reset, msg) }
+
+// Init performs the full codemob initialization.
+// installDir is the directory where codemob.sh lives.
+func Init(installDir string) error {
+	fmt.Println("codemob init")
+	fmt.Println("────────────")
+	fmt.Println()
+
+	fmt.Println("Global setup:")
+	if err := checkDependencies(); err != nil {
+		return err
+	}
+	setupGlobalGitignore()
+	setupShellIntegration(installDir)
+	setupClaudeCommands()
+
+	fmt.Println()
+	fmt.Println("Repo setup:")
+	setupRepo()
+
+	_, rcName := detectShellRC()
+	fmt.Println()
+	info(fmt.Sprintf("Done! Open a new terminal or run: source %s", rcName))
+	return nil
+}
+
+func checkDependencies() error {
+	if _, err := exec.LookPath("git"); err != nil {
+		errMsg("git is not installed. codemob requires git.")
+		return fmt.Errorf("git not found")
+	}
+	return nil
+}
+
+func setupGlobalGitignore() {
+	// Find the global gitignore file
+	gitignoreFile := ""
+	out, err := exec.Command("git", "config", "--global", "core.excludesFile").Output()
+	if err == nil {
+		gitignoreFile = strings.TrimSpace(string(out))
+	}
+
+	if gitignoreFile == "" {
+		gitignoreFile = filepath.Join(os.Getenv("HOME"), ".config", "git", "ignore")
+	} else {
+		// Expand ~ if present
+		if strings.HasPrefix(gitignoreFile, "~") {
+			gitignoreFile = filepath.Join(os.Getenv("HOME"), gitignoreFile[1:])
+		}
+	}
+
+	// Ensure parent dir exists
+	os.MkdirAll(filepath.Dir(gitignoreFile), 0755)
+
+	// Check if already contains .codemob/
+	if fileContains(gitignoreFile, ".codemob/") {
+		info("Global gitignore already contains .codemob/")
+		return
+	}
+
+	// Append
+	f, err := os.OpenFile(gitignoreFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		warn(fmt.Sprintf("Could not write to %s: %v", gitignoreFile, err))
+		return
+	}
+	defer f.Close()
+
+	f.WriteString("\n# codemob workspaces\n.codemob/\n")
+	info(fmt.Sprintf("Added .codemob/ to global gitignore (%s)", gitignoreFile))
+}
+
+func detectShellRC() (string, string) {
+	shell := os.Getenv("SHELL")
+	home := os.Getenv("HOME")
+
+	switch {
+	case strings.HasSuffix(shell, "/zsh"):
+		return filepath.Join(home, ".zshrc"), "~/.zshrc"
+	case strings.HasSuffix(shell, "/bash"):
+		// Prefer .bashrc, fall back to .bash_profile
+		bashrc := filepath.Join(home, ".bashrc")
+		if _, err := os.Stat(bashrc); err == nil {
+			return bashrc, "~/.bashrc"
+		}
+		return filepath.Join(home, ".bash_profile"), "~/.bash_profile"
+	default:
+		// Default to .profile
+		return filepath.Join(home, ".profile"), "~/.profile"
+	}
+}
+
+func setupShellIntegration(installDir string) {
+	rcFile, rcName := detectShellRC()
+	sourceLine := fmt.Sprintf(`source "%s/codemob.sh"`, installDir)
+
+	// Check if any codemob source line exists
+	if fileContains(rcFile, "codemob.sh") {
+		existing := fileLineContaining(rcFile, "codemob.sh")
+		if existing == sourceLine {
+			info(fmt.Sprintf("Shell integration already configured in %s", rcName))
+			return
+		}
+		replaceLineInFile(rcFile, "codemob.sh", sourceLine)
+		info(fmt.Sprintf("Updated codemob source path in %s", rcName))
+		return
+	}
+
+	// Append
+	f, err := os.OpenFile(rcFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		warn(fmt.Sprintf("Could not write to %s: %v", rcName, err))
+		return
+	}
+	defer f.Close()
+
+	f.WriteString("\n# codemob - AI agent workspace manager\n")
+	f.WriteString(sourceLine + "\n")
+	info(fmt.Sprintf("Added shell integration to %s", rcName))
+}
+
+func setupClaudeCommands() {
+	commandsDir := filepath.Join(os.Getenv("HOME"), ".claude", "commands")
+	os.MkdirAll(commandsDir, 0755)
+
+	installed := 0
+	for name, content := range SlashCommands {
+		dest := filepath.Join(commandsDir, name)
+		// Check if file exists and has same content
+		existing, err := os.ReadFile(dest)
+		if err == nil && string(existing) == content {
+			continue
+		}
+		if err := os.WriteFile(dest, []byte(content), 0644); err != nil {
+			warn(fmt.Sprintf("Could not write %s: %v", dest, err))
+			continue
+		}
+		installed++
+	}
+
+	if installed > 0 {
+		info(fmt.Sprintf("Installed %d Claude slash command(s) to ~/.claude/commands/", installed))
+	} else {
+		info("Claude slash commands are up to date")
+	}
+}
+
+func setupRepo() {
+	root, err := gitutil.RepoRoot()
+	if err != nil {
+		warn("Not inside a git repository. Skipping repo setup.")
+		warn("Run 'codemob init' again from inside a git repo to set up a project.")
+		return
+	}
+
+	codemobDir := filepath.Join(root, CodemobDir)
+	configFile := filepath.Join(root, ConfigFile)
+
+	// Create directories
+	os.MkdirAll(filepath.Join(root, MobsDir), 0755)
+
+	if _, err := os.Stat(configFile); err == nil {
+		info(fmt.Sprintf("Repo already initialized at %s", root))
+		return
+	}
+
+	// Detect base branch
+	defaultBranch := gitutil.DetectDefaultBranch(root)
+
+	// Prompt
+	fmt.Println()
+	fmt.Printf("Base branch for new mobs [%s]: ", defaultBranch)
+	reader := bufio.NewReader(os.Stdin)
+	input, _ := reader.ReadString('\n')
+	input = strings.TrimSpace(input)
+	if input != "" {
+		defaultBranch = input
+	}
+
+	// Create config
+	cfg := Config{
+		DefaultAgent: "claude",
+		BaseBranch:   defaultBranch,
+		Mobs:         []Mob{},
+	}
+	data, _ := json.MarshalIndent(cfg, "", "  ")
+	os.WriteFile(configFile, append(data, '\n'), 0644)
+
+	_ = codemobDir
+	info(fmt.Sprintf("Created %s (base_branch: %s)", configFile, defaultBranch))
+}
+
+// ─── File helpers ─────────────────────────────────────────────────────────────
+
+func fileContains(path, substr string) bool {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	return strings.Contains(string(data), substr)
+}
+
+func fileLineContaining(path, substr string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.Contains(line, substr) {
+			return strings.TrimSpace(line)
+		}
+	}
+	return ""
+}
+
+func replaceLineInFile(path, match, replacement string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	lines := strings.Split(string(data), "\n")
+	for i, line := range lines {
+		if strings.Contains(line, match) {
+			lines[i] = replacement
+		}
+	}
+	os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0644)
+}
