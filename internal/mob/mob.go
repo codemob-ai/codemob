@@ -89,6 +89,25 @@ func Reconcile(repoRoot string, cfg *Config) bool {
 	return changed
 }
 
+// CurrentMobName returns the name of the mob we're currently inside, or "" if not in a mob.
+func CurrentMobName() string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	marker := "/" + MobsDir + "/"
+	idx := strings.Index(cwd, marker)
+	if idx == -1 {
+		return ""
+	}
+	rest := cwd[idx+len(marker):]
+	// Take the first path component
+	if slash := strings.Index(rest, "/"); slash != -1 {
+		return rest[:slash]
+	}
+	return rest
+}
+
 // FindMob finds a mob by name.
 func FindMob(cfg *Config, name string) *Mob {
 	for i := range cfg.Mobs {

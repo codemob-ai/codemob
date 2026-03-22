@@ -32,7 +32,9 @@ func Execute() error {
 	case "--new":
 		return cmdNew(args)
 	case "--list", "--ls":
-		return cmdList(args)
+		return cmdList(args, false)
+	case "--list-others":
+		return cmdList(args, true)
 	case "--resume", "--switch":
 		return cmdResume(args)
 
@@ -48,7 +50,7 @@ func Execute() error {
 	case "new":
 		return cmdNew(args)
 	case "list":
-		return cmdList(args)
+		return cmdList(args, false)
 	case "resolve":
 		return cmdResolve(args)
 	case "write-next":
@@ -161,20 +163,32 @@ func cmdNew(args []string) error {
 	return nil
 }
 
-func cmdList(_ []string) error {
+func cmdList(_ []string, excludeCurrent bool) error {
 	_, cfg, err := requireInit()
 	if err != nil {
 		return err
 	}
 
-	if len(cfg.Mobs) == 0 {
+	mobs := cfg.Mobs
+	if excludeCurrent {
+		current := mob.CurrentMobName()
+		var filtered []mob.Mob
+		for _, m := range mobs {
+			if m.Name != current {
+				filtered = append(filtered, m)
+			}
+		}
+		mobs = filtered
+	}
+
+	if len(mobs) == 0 {
 		fmt.Println("No mobs. Create one with: codemob --new <name>")
 		return nil
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "NAME\tBRANCH\tAGENT\tCREATED")
-	for _, m := range cfg.Mobs {
+	for _, m := range mobs {
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", m.Name, m.Branch, m.Agent, mob.RelativeTime(m.CreatedAt))
 	}
 	w.Flush()
@@ -361,35 +375,46 @@ func launchAgent(root, agent, workdir string, resume bool) error {
 }
 
 // runAgent spawns the agent process and waits for it to exit.
+// If resume is true and the agent fails (e.g., no session to continue), falls back to a new session.
 func runAgent(agent, workdir string, resume bool) error {
-	var agentBin string
-	var agentArgs []string
+	binPath, resumeArgs, newArgs, err := agentArgs(agent)
+	if err != nil {
+		return err
+	}
 
+	if resume {
+		err := spawnAgent(binPath, resumeArgs, workdir)
+		if err == nil {
+			return nil
+		}
+		// Resume failed (no prior session) — fall back to new session
+		fmt.Println("No previous session found, starting new session...")
+	}
+
+	return spawnAgent(binPath, newArgs, workdir)
+}
+
+func agentArgs(agent string) (binPath string, resumeArgs, newArgs []string, err error) {
 	switch agent {
 	case "claude":
-		agentBin = "claude"
-		if resume {
-			agentArgs = []string{"--continue"}
-		} else {
-			agentArgs = []string{}
-		}
+		binPath, err = exec.LookPath("claude")
+		resumeArgs = []string{"--continue"}
+		newArgs = []string{}
 	case "codex":
-		agentBin = "codex"
-		if resume {
-			agentArgs = []string{"resume", "--last"}
-		} else {
-			agentArgs = []string{}
-		}
+		binPath, err = exec.LookPath("codex")
+		resumeArgs = []string{"resume", "--last"}
+		newArgs = []string{}
 	default:
-		return fmt.Errorf("unknown agent: %s", agent)
+		err = fmt.Errorf("unknown agent: %s", agent)
 	}
-
-	binPath, err := exec.LookPath(agentBin)
 	if err != nil {
-		return fmt.Errorf("agent '%s' not found on PATH", agentBin)
+		return "", nil, nil, fmt.Errorf("agent '%s' not found on PATH", agent)
 	}
+	return
+}
 
-	cmd := exec.Command(binPath, agentArgs...)
+func spawnAgent(binPath string, args []string, workdir string) error {
+	cmd := exec.Command(binPath, args...)
 	cmd.Dir = workdir
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout

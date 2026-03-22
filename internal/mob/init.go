@@ -26,9 +26,11 @@ Then tell the user: "The command has been copied to your clipboard. Exit this se
 `,
 	"switch": `Switch to a different codemob workspace.
 
-Run ` + "`codemob --list`" + ` using the Bash tool and display the results to the user.
+Run ` + "`codemob --list-others`" + ` using the Bash tool.
 
-Ask the user which mob they want to switch to.
+If the output says "No mobs", tell the user there are no other mobs to switch to and suggest using /mob-new to create one.
+
+Otherwise, display the results and ask the user which mob they want to switch to.
 
 Once they pick one, run ` + "`codemob write-next switch <name>`" + ` using the Bash tool (replace ` + "`<name>`" + ` with the chosen mob name).
 
