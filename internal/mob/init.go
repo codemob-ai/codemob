@@ -12,13 +12,19 @@ import (
 	gitutil "github.com/codemob-ai/codemob/internal/git"
 )
 
-// slashCommandDefs defines the slash command content. Each is installed under both
-// "mob-*" and "codemob-*" names so either /mob-ls or /codemob-ls works.
-var slashCommandDefs = map[string]string{
-	"list": "List all codemob workspaces and their status.\n\nRun exactly this command using the Bash tool: codemob --list\n\nDo NOT use go run, do NOT cd anywhere. Just run: codemob --list\n\nDisplay the output to the user.\n",
-	"new": `Create a new codemob workspace.
+type commandDef struct {
+	Description string // shown in agent's command picker
+	Body        string // instructions for the agent
+}
 
-Ask the user if they want to provide a name or have one auto-generated.
+var slashCommandDefs = map[string]commandDef{
+	"list": {
+		Description: "List all codemob workspaces and their status",
+		Body:        "Run exactly this command using the Bash tool: codemob --list\n\nDo NOT use go run, do NOT cd anywhere. Just run: codemob --list\n\nDisplay the output to the user.\n",
+	},
+	"new": {
+		Description: "Create a new codemob workspace",
+		Body: `Ask the user if they want to provide a name or have one auto-generated.
 
 If they provide a name, run: ` + "`codemob queue new <name>`" + ` (replace ` + "`<name>`" + ` with their choice).
 If they want auto-generated, run: ` + "`codemob queue new`" + ` (no name argument — codemob generates one).
@@ -27,9 +33,10 @@ Do NOT generate a name yourself — codemob handles name generation.
 
 Then tell the user: "New mob queued. Exit this session (Ctrl+C) and codemob will automatically create and launch the new mob."
 `,
-	"switch": `Switch to a different codemob workspace.
-
-Run ` + "`codemob --list-others`" + ` using the Bash tool.
+	},
+	"switch": {
+		Description: "Switch to a different codemob workspace",
+		Body: `Run ` + "`codemob --list-others`" + ` using the Bash tool.
 
 If the output says "No mobs", tell the user there are no other mobs to switch to and suggest using /mob-new or /codemob-new to create one.
 
@@ -39,17 +46,19 @@ Once they pick one, run ` + "`codemob queue switch <name>`" + ` using the Bash t
 
 Then tell the user: "Switch queued. Exit this session (Ctrl+C) and codemob will automatically launch the new mob."
 `,
-	"switch-agent": `Switch the current mob to a different AI agent (e.g., from Claude to Codex or vice versa).
-
-Ask the user which agent they want to switch to (claude, codex, etc.).
+	},
+	"switch-agent": {
+		Description: "Switch the current mob to a different AI agent",
+		Body: `Ask the user which agent they want to switch to (claude, codex, etc.).
 
 Once they pick one, run ` + "`codemob queue switch-agent <agent>`" + ` using the Bash tool (replace ` + "`<agent>`" + ` with the chosen agent name).
 
 Then tell the user: "Agent switch queued. Exit this session (Ctrl+C) and codemob will relaunch with the new agent."
 `,
-	"remove": `Remove a codemob workspace (worktree + branch).
-
-Run ` + "`codemob --list`" + ` using the Bash tool and display the results.
+	},
+	"remove": {
+		Description: "Remove a codemob workspace",
+		Body: `Run ` + "`codemob --list`" + ` using the Bash tool and display the results.
 
 Determine the current mob by checking if the working directory contains ` + "`.codemob/mobs/`" + ` — if so, extract the mob name from the path.
 
@@ -59,16 +68,29 @@ If they choose a DIFFERENT mob (not the current one), run ` + "`codemob remove <
 
 If they choose the CURRENT mob, run ` + "`codemob queue remove <name>`" + ` and tell them: "Removal queued. Exit this session (Ctrl+C) and codemob will remove the mob."
 `,
+	},
 }
 
-// SlashCommands returns the full map of filename → content, with both mob-* and codemob-* variants.
+// SlashCommands returns Claude Code slash commands (description as first line, then body).
 func SlashCommands() map[string]string {
 	cmds := make(map[string]string)
-	for name, content := range slashCommandDefs {
+	for name, def := range slashCommandDefs {
+		content := def.Description + ".\n\n" + def.Body
 		cmds["mob-"+name+".md"] = content
 		cmds["codemob-"+name+".md"] = content
 	}
 	return cmds
+}
+
+// CodexPrompts returns Codex custom prompts (YAML front matter with description, then body).
+func CodexPrompts() map[string]string {
+	prompts := make(map[string]string)
+	for name, def := range slashCommandDefs {
+		prompt := fmt.Sprintf("---\ndescription: %s\n---\n\n%s\n", def.Description, def.Body)
+		prompts["mob-"+name+".md"] = prompt
+		prompts["codemob-"+name+".md"] = prompt
+	}
+	return prompts
 }
 
 const (
@@ -118,6 +140,7 @@ func Init(installDir string) error {
 	fmt.Println("Repo setup:")
 	repoRoot := setupRepo()
 	setupClaudeCommands(repoRoot)
+	setupCodexPrompts()
 
 	rcFile, rcName := detectShellRC()
 	fmt.Println()
@@ -406,6 +429,31 @@ func setupClaudeCommands(repoRoot string) {
 	}
 }
 
+func setupCodexPrompts() {
+	promptsDir := filepath.Join(os.Getenv("HOME"), ".codex", "prompts")
+	os.MkdirAll(promptsDir, 0755)
+
+	installed := 0
+	for name, content := range CodexPrompts() {
+		dest := filepath.Join(promptsDir, name)
+		existing, err := os.ReadFile(dest)
+		if err == nil && string(existing) == content {
+			continue
+		}
+		if err := os.WriteFile(dest, []byte(content), 0644); err != nil {
+			warn(fmt.Sprintf("Could not write %s: %v", dest, err))
+			continue
+		}
+		installed++
+	}
+
+	if installed > 0 {
+		info("Installed Codex prompts")
+	} else {
+		info("Codex prompts are up to date")
+	}
+}
+
 func setupRepo() string {
 	root, err := gitutil.RepoRoot()
 	if err != nil {
@@ -537,6 +585,20 @@ func Uninstall(installDir string) error {
 
 	// Remove Claude permissions
 	removeClaudePermissions()
+
+	// Remove Codex prompts
+	promptsDir := filepath.Join(os.Getenv("HOME"), ".codex", "prompts")
+	removedPrompts := 0
+	for name := range CodexPrompts() {
+		if err := os.Remove(filepath.Join(promptsDir, name)); err == nil {
+			removedPrompts++
+		}
+	}
+	if removedPrompts > 0 {
+		info("Removed Codex prompts")
+	} else {
+		info("No Codex prompts to clean up")
+	}
 
 	fmt.Println()
 	info("Uninstalled. Open a new terminal for changes to take effect.")
