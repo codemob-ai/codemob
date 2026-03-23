@@ -640,6 +640,7 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 		}
 		cfg.Mobs = remaining
 		_ = mob.SaveConfig(root, cfg)
+		cleanSessionFiles(root, m.Name)
 		mobStatus(fmt.Sprintf("Removed mob '%s'", m.Name))
 		return "", "", false, nil // no agent to launch
 

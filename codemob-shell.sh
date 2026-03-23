@@ -5,7 +5,7 @@
 #   - claude/codex wrappers with --new-mob / --resume-mob flags
 
 # Unique per-terminal session ID — used by codemob to track the last active mob
-# per terminal so `--resume` can default to it without collisions.
+# per terminal so `resume` can default to it without collisions.
 [ -z "$CODEMOB_SESSION" ] && export CODEMOB_SESSION=$(uuidgen 2>/dev/null || cat /proc/sys/kernel/random/uuid 2>/dev/null || echo $$)
 
 codemob() {
