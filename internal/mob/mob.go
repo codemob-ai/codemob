@@ -110,6 +110,9 @@ func ValidateName(name string) error {
 	if allDigits {
 		return fmt.Errorf("mob name cannot be purely numeric (conflicts with index-based selection)")
 	}
+	if name == "root" {
+		return fmt.Errorf("mob name 'root' is reserved")
+	}
 	if name[0] == '-' || name[len(name)-1] == '-' {
 		return fmt.Errorf("mob name cannot start or end with a hyphen")
 	}
