@@ -74,9 +74,13 @@ If they choose the CURRENT mob, run ` + "`codemob queue remove <name>`" + ` and 
 }
 
 // SlashCommands returns Claude Code slash commands (description as first line, then body).
-func SlashCommands() map[string]string {
+// When multipleAgents is false, the change-agent command is omitted.
+func SlashCommands(multipleAgents bool) map[string]string {
 	cmds := make(map[string]string)
 	for name, def := range slashCommandDefs {
+		if name == "change-agent" && !multipleAgents {
+			continue
+		}
 		content := def.Description + ".\n\n" + def.Body
 		cmds["mob-"+name+".md"] = content
 		cmds["codemob-"+name+".md"] = content
@@ -85,9 +89,13 @@ func SlashCommands() map[string]string {
 }
 
 // CodexPrompts returns Codex custom prompts (YAML front matter with description, then body).
-func CodexPrompts() map[string]string {
+// When multipleAgents is false, the change-agent prompt is omitted.
+func CodexPrompts(multipleAgents bool) map[string]string {
 	prompts := make(map[string]string)
 	for name, def := range slashCommandDefs {
+		if name == "change-agent" && !multipleAgents {
+			continue
+		}
 		prompt := fmt.Sprintf("---\ndescription: %s\n---\n\n%s\n", def.Description, def.Body)
 		prompts["mob-"+name+".md"] = prompt
 		prompts["codemob-"+name+".md"] = prompt
@@ -96,12 +104,11 @@ func CodexPrompts() map[string]string {
 }
 
 const (
-	green  = "\033[0;32m"
-	yellow = "\033[0;33m"
-	red    = "\033[0;31m"
+	green  = "\033[38;2;106;191;105m" // #6abf69 — bright green derived from brand #002900
+	yellow = "\033[38;2;231;220;96m"  // #e7dc60 — brand accent
+	red    = "\033[38;2;217;83;79m"   // #d9534f — warm red to match brand palette
 	reset  = "\033[0m"
-	// Brand accent #e7dc60
-	accent = "\033[38;2;231;220;96m"
+	accent = "\033[38;2;231;220;96m" // #e7dc60 — brand accent
 )
 
 func printBanner() {
@@ -122,9 +129,9 @@ func printBanner() {
 	fmt.Println()
 }
 
-func info(msg string)  { fmt.Printf("%s✓%s %s\n", green, reset, msg) }
-func warn(msg string)  { fmt.Printf("%s!%s %s\n", yellow, reset, msg) }
-func errMsg(msg string) { fmt.Fprintf(os.Stderr, "%s✗%s %s\n", red, reset, msg) }
+func info(msg string)   { fmt.Printf("%s✓ %s%s\n", green, msg, reset) }
+func warn(msg string)   { fmt.Printf("%s! %s%s\n", yellow, msg, reset) }
+func errMsg(msg string) { fmt.Printf("%s✗ %s%s\n", red, msg, reset) }
 
 // Init performs the full codemob initialization.
 // installDir is the directory where codemob-shell.sh lives.
@@ -135,18 +142,26 @@ func Init(installDir string, forceReprompt bool) error {
 	fmt.Println()
 
 	fmt.Println("Global setup:")
-	if err := checkDependencies(); err != nil {
+	claude, codex, err := checkDependencies()
+	if err != nil {
 		return err
 	}
 	setupGlobalGitignore()
 	setupShellIntegration(installDir)
-	setupClaudePermissions()
+	if claude.installed {
+		setupClaudePermissions()
+	}
 
 	fmt.Println()
 	fmt.Println("Repo setup:")
+	bothReady := claude.authenticated && codex.authenticated
 	repoRoot := setupRepo(forceReprompt)
-	setupClaudeCommands(repoRoot)
-	setupCodexPrompts()
+	if claude.authenticated {
+		setupClaudeCommands(repoRoot, bothReady)
+	}
+	if codex.authenticated {
+		setupCodexPrompts(bothReady)
+	}
 
 	rcFile, rcName := detectShellRC()
 	fmt.Println()
@@ -160,12 +175,83 @@ func Init(installDir string, forceReprompt bool) error {
 	return nil
 }
 
-func checkDependencies() error {
+type agentStatus struct {
+	installed     bool
+	authenticated bool
+}
+
+// checkDependencies checks git and agent availability. Returns per-agent status.
+func checkDependencies() (claude, codex agentStatus, err error) {
 	if _, err := exec.LookPath("git"); err != nil {
 		errMsg("git is not installed. codemob requires git.")
-		return fmt.Errorf("git not found")
+		return agentStatus{}, agentStatus{}, fmt.Errorf("git not found")
 	}
-	return nil
+	info("git found")
+
+	claude = checkAgent("claude", "npm install -g @anthropic-ai/claude-code")
+	codex = checkAgent("codex", "npm install -g @openai/codex")
+
+	if !claude.installed && !codex.installed {
+		fmt.Println()
+		errMsg("No AI agents found. codemob requires at least one (claude or codex).")
+		return claude, codex, fmt.Errorf("no agents found")
+	}
+	return claude, codex, nil
+}
+
+func checkAgent(name, installHint string) agentStatus {
+	_, err := exec.LookPath(name)
+	if err != nil {
+		errMsg(fmt.Sprintf("%s not found — install: %s", name, installHint))
+		return agentStatus{}
+	}
+
+	out, err := exec.Command(name, "--version").Output()
+	if err != nil {
+		warn(fmt.Sprintf("%s found but could not determine version", name))
+		return agentStatus{installed: true}
+	}
+
+	version := strings.TrimSpace(string(out))
+	// Some tools output multi-line; take first line only.
+	if i := strings.IndexByte(version, '\n'); i != -1 {
+		version = version[:i]
+	}
+	info(fmt.Sprintf("%s found (%s)", name, version))
+
+	auth := checkAgentAuth(name)
+	return agentStatus{installed: true, authenticated: auth}
+}
+
+// checkAgentAuth is a best-effort auth check. Never blocks init.
+func checkAgentAuth(name string) bool {
+	switch name {
+	case "claude":
+		out, err := exec.Command("claude", "auth", "status", "--json").Output()
+		if err != nil {
+			warn(fmt.Sprintf("Could not verify %s auth — unauthenticated agents may not work as expected", name))
+			return false
+		}
+		var result struct {
+			LoggedIn bool `json:"loggedIn"`
+		}
+		if err := json.Unmarshal(out, &result); err != nil || !result.LoggedIn {
+			errMsg(fmt.Sprintf("%s is not authenticated — run: claude auth login", name))
+			return false
+		}
+		info(fmt.Sprintf("%s authenticated", name))
+		return true
+
+	case "codex":
+		// Exit code 0 = logged in, non-zero = not logged in or command failed
+		if err := exec.Command("codex", "login", "status").Run(); err != nil {
+			errMsg(fmt.Sprintf("%s is not authenticated — run: codex login", name))
+			return false
+		}
+		info(fmt.Sprintf("%s authenticated", name))
+		return true
+	}
+	return false
 }
 
 func setupGlobalGitignore() {
@@ -428,7 +514,7 @@ func removeClaudePermissions() {
 	info("Removed codemob permissions from Claude settings")
 }
 
-func setupClaudeCommands(repoRoot string) {
+func setupClaudeCommands(repoRoot string, multipleAgents bool) {
 	if repoRoot == "" {
 		warn("Not inside a git repository. Skipping Claude commands setup.")
 		return
@@ -437,7 +523,7 @@ func setupClaudeCommands(repoRoot string) {
 	os.MkdirAll(commandsDir, 0755)
 
 	installed := 0
-	for name, content := range SlashCommands() {
+	for name, content := range SlashCommands(multipleAgents) {
 		dest := filepath.Join(commandsDir, name)
 		// Check if file exists and has same content
 		existing, err := os.ReadFile(dest)
@@ -458,12 +544,12 @@ func setupClaudeCommands(repoRoot string) {
 	}
 }
 
-func setupCodexPrompts() {
+func setupCodexPrompts(multipleAgents bool) {
 	promptsDir := filepath.Join(os.Getenv("HOME"), ".codex", "prompts")
 	os.MkdirAll(promptsDir, 0755)
 
 	installed := 0
-	for name, content := range CodexPrompts() {
+	for name, content := range CodexPrompts(multipleAgents) {
 		dest := filepath.Join(promptsDir, name)
 		existing, err := os.ReadFile(dest)
 		if err == nil && string(existing) == content {
@@ -588,7 +674,7 @@ func Uninstall(installDir string) error {
 		info("Removed .codemob/ and all worktrees")
 
 		// Remove slash commands from project
-		for name := range SlashCommands() {
+		for name := range SlashCommands(true) {
 			os.Remove(filepath.Join(repoRoot, ".claude", "commands", name))
 		}
 		info("Removed codemob slash commands from .claude/commands/")
@@ -626,7 +712,7 @@ func Uninstall(installDir string) error {
 	// Remove Codex prompts
 	promptsDir := filepath.Join(os.Getenv("HOME"), ".codex", "prompts")
 	removedPrompts := 0
-	for name := range CodexPrompts() {
+	for name := range CodexPrompts(true) {
 		if err := os.Remove(filepath.Join(promptsDir, name)); err == nil {
 			removedPrompts++
 		}

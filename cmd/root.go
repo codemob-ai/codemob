@@ -22,6 +22,34 @@ func mobStatus(msg string) {
 	fmt.Println()
 }
 
+// mobProgress prints a transient progress line and returns a handle to finish it.
+// Use defer p.Clear() immediately after calling to guarantee cleanup on any exit path.
+type progress struct{ active bool }
+
+func mobProgress(msg string) *progress {
+	// Leading blank line + message, no trailing newline — cursor stays on this line
+	fmt.Printf("\n  \033[38;2;231;220;96m● codemob\033[0m  %s", msg)
+	return &progress{active: true}
+}
+
+// Done replaces the progress line with a final status message.
+func (p *progress) Done(msg string) {
+	if !p.active {
+		return
+	}
+	p.active = false
+	fmt.Printf("\r\033[2K  \033[38;2;231;220;96m● codemob\033[0m  %s\n\n", msg)
+}
+
+// Clear removes the progress line without replacing it.
+func (p *progress) Clear() {
+	if !p.active {
+		return
+	}
+	p.active = false
+	fmt.Printf("\r\033[2K")
+}
+
 // Version is set at build time via ldflags.
 var Version = "dev"
 
@@ -174,6 +202,9 @@ func cmdNew(args []string) error {
 	branch := "mob/" + name
 	worktreePath := filepath.Join(root, mob.MobsDir, name)
 
+	p := mobProgress(fmt.Sprintf("Creating mob '%s'...", name))
+	defer p.Clear()
+
 	if err := gitutil.WorktreeAdd(root, worktreePath, branch, cfg.BaseBranch); err != nil {
 		return err
 	}
@@ -189,7 +220,7 @@ func cmdNew(args []string) error {
 		return err
 	}
 
-	mobStatus(fmt.Sprintf("Created mob '%s' on branch %s", name, branch))
+	p.Done(fmt.Sprintf("Created mob '%s' on branch %s", name, branch))
 
 	if !noLaunch {
 		return launchAgent(root, agent, worktreePath, false)
@@ -427,6 +458,9 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 		if newAgent == "" {
 			return "", "", false, fmt.Errorf("agent name required")
 		}
+		if _, err := exec.LookPath(newAgent); err != nil {
+			return "", "", false, fmt.Errorf("agent '%s' is not installed", newAgent)
+		}
 		// Update the mob's agent in config
 		m.Agent = newAgent
 		_ = mob.SaveConfig(root, cfg)
@@ -448,6 +482,9 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 		branch := "mob/" + name
 		worktreePath := filepath.Join(root, mob.MobsDir, name)
 
+		p := mobProgress(fmt.Sprintf("Creating mob '%s'...", name))
+		defer p.Clear()
+
 		if err := gitutil.WorktreeAdd(root, worktreePath, branch, cfg.BaseBranch); err != nil {
 			return "", "", false, err
 		}
@@ -467,7 +504,7 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 			return "", "", false, err
 		}
 
-		mobStatus(fmt.Sprintf("Created mob '%s' on branch %s", name, branch))
+		p.Done(fmt.Sprintf("Created mob '%s' on branch %s", name, branch))
 		return worktreePath, agent, false, nil
 
 	case "remove":

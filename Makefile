@@ -13,6 +13,7 @@ build:
 	@echo "  → ./codemob"
 
 install:
+	@command -v go >/dev/null 2>&1 || { echo "Error: Go is not installed."; echo ""; echo "Install via Homebrew:  brew install go"; echo "Or visit:             https://go.dev/dl/"; exit 1; }
 	@echo "Dev install — emulating Homebrew layout at $(PREFIX)"
 	@echo ""
 	@mkdir -p $(BINDIR) $(SHAREDIR)
