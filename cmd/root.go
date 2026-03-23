@@ -395,16 +395,26 @@ func cmdPurge(_ []string) error {
 		return nil
 	}
 
+	r := mob.ColorRed
+	rst := mob.ColorReset
+
 	fmt.Println()
-	fmt.Printf("  \033[38;2;255;69;58m● codemob\033[0m  This will remove all %d mob(s) and their worktrees.\n", len(cfg.Mobs))
+	fmt.Printf("  %s⚠ DESTRUCTIVE OPERATION%s\n", r, rst)
+	fmt.Println()
+	fmt.Printf("  This will permanently remove all %s%d mob(s)%s and their worktrees.\n", r, len(cfg.Mobs), rst)
+	fmt.Printf("  Any %suncommitted or unpushed changes%s in those worktrees will be %spermanently lost%s.\n", r, rst, r, rst)
+	fmt.Println()
+	fmt.Printf("  %sThis cannot be undone.%s\n", r, rst)
 	fmt.Print("\n  Are you sure? [y/N]: ")
 
 	var input string
 	fmt.Scanln(&input)
 	if input != "y" && input != "yes" {
-		fmt.Println("Cancelled.")
+		fmt.Println("  Cancelled.")
 		return nil
 	}
+
+	mob.PrintBanner(mob.ColorRed)
 
 	for _, m := range cfg.Mobs {
 		worktreePath := filepath.Join(root, mob.MobsDir, m.Name)
@@ -412,7 +422,7 @@ func cmdPurge(_ []string) error {
 			_ = gitutil.WorktreeRemove(root, worktreePath, true)
 		}
 		_ = gitutil.BranchDelete(root, m.Branch)
-		fmt.Printf("  Removed '%s'\n", m.Name)
+		fmt.Printf("  %s✗%s Removed '%s'\n", r, rst, m.Name)
 	}
 
 	cfg.Mobs = nil
@@ -421,7 +431,7 @@ func cmdPurge(_ []string) error {
 	}
 
 	fmt.Println()
-	fmt.Printf("  \033[38;2;255;69;58m● codemob\033[0m  All mobs purged\n")
+	fmt.Printf("  %s● codemob%s  All mobs purged\n", r, rst)
 	fmt.Println()
 	return nil
 }
