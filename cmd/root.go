@@ -558,7 +558,7 @@ func cmdWriteNext(args []string) error {
 // After the agent exits, it checks for a next action (e.g., switch to another mob).
 func launchAgent(root, agent, workdir string, resume bool) error {
 	for {
-		if err := runAgent(agent, workdir, resume); err != nil {
+		if err := runAgent(root, agent, workdir, resume); err != nil {
 			// Log non-signal errors (signal exits are normal — user pressed Ctrl+C)
 			if _, ok := err.(*exec.ExitError); !ok {
 				fmt.Fprintf(os.Stderr, "  [codemob] agent error: %v\n", err)
@@ -587,8 +587,8 @@ func launchAgent(root, agent, workdir string, resume bool) error {
 
 // runAgent spawns the agent process and waits for it to exit.
 // If resume is true and the agent fails (e.g., no session to continue), falls back to a new session.
-func runAgent(agent, workdir string, resume bool) error {
-	binPath, resumeArgs, newArgs, err := agentArgs(agent)
+func runAgent(root, agent, workdir string, resume bool) error {
+	binPath, resumeArgs, newArgs, err := agentArgs(agent, root)
 	if err != nil {
 		return err
 	}
@@ -610,16 +610,16 @@ func runAgent(agent, workdir string, resume bool) error {
 	return spawnAgent(binPath, newArgs, workdir)
 }
 
-func agentArgs(agent string) (binPath string, resumeArgs, newArgs []string, err error) {
+func agentArgs(agent, repoRoot string) (binPath string, resumeArgs, newArgs []string, err error) {
 	switch agent {
 	case "claude":
 		binPath, err = exec.LookPath("claude")
-		resumeArgs = []string{"--continue"}
-		newArgs = []string{}
+		resumeArgs = []string{"--continue", "--add-dir", repoRoot}
+		newArgs = []string{"--add-dir", repoRoot}
 	case "codex":
 		binPath, err = exec.LookPath("codex")
-		resumeArgs = []string{"resume", "--last"}
-		newArgs = []string{}
+		resumeArgs = []string{"resume", "--last", "--add-dir", repoRoot}
+		newArgs = []string{"--add-dir", repoRoot}
 	default:
 		err = fmt.Errorf("unknown agent: %s", agent)
 	}
