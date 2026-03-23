@@ -25,21 +25,15 @@ Two layers:
 
 ## CLI interface
 
-Core workflow — flags on `codemob`/`mob`:
+Commands:
 ```
 codemob --new [name]        # create mob + launch agent
 codemob --resume <name>     # resume a mob (launch agent in worktree)
-codemob --switch <name>     # alias for --resume
 codemob --list              # list all mobs
-codemob --list-others       # list mobs excluding current (for slash commands)
-```
-
-Management — subcommands:
-```
 codemob init                # first-time setup (global + repo)
 codemob reinit              # alias for init (idempotent)
 codemob remove <name>       # remove a mob (accepts name or index)
-codemob clear               # remove all mobs (with confirmation)
+codemob purge               # remove all mobs (with confirmation)
 codemob uninstall           # remove all codemob setup (global + local)
 ```
 
@@ -53,15 +47,11 @@ Options:
 
 Claude/Codex wrappers (installed by init):
 ```
-claude --new-mob [name]     # → codemob --new --agent claude [name]
+claude --mob [name]         # → codemob --new --agent claude [name]
+claude --new-mob [name]     # same as --mob
 claude --resume-mob <name>  # → codemob --resume <name>
-codex --new-mob [name]      # → codemob --new --agent codex [name]
-```
-
-Internal (used by slash commands):
-```
-codemob queue <action> [target]   # write queued action for trampoline
-codemob --check-queue             # process queued action (called by shell wrapper)
+codex --mob [name]          # → codemob --new --agent codex [name]
+codex --resume-mob <name>   # → codemob --resume <name>
 ```
 
 ## Build

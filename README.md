@@ -119,6 +119,7 @@ codemob --new brave-mango        # named mob
 codemob --new --agent codex      # pick agent
 claude --new-mob                 # shorthand, launches claude
 claude --new-mob brave-mango     # shorthand with name
+claude --mob                     # even shorter
 codex --new-mob                  # shorthand, launches codex
 
 # manage
@@ -126,10 +127,10 @@ codemob --list                   # list mobs (with indices)
 codemob --resume brave-mango     # resume by name
 codemob --resume 2               # resume by index
 codemob remove brave-mango       # remove one
-codemob clear                    # remove all
+codemob purge                    # remove all
 ```
 
-Shell aliases (`claude --new-mob`, `codex --new-mob`, `mob --new`) also work after `codemob init`.
+Shell aliases (`claude --new-mob`, `claude --mob`, `codex --new-mob`, `mob --new`) also work after `codemob init`.
 
 ### Inside Claude Code / Codex
 

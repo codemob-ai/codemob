@@ -70,19 +70,13 @@ func Execute() error {
 	args := os.Args[2:]
 
 	switch cmd {
-	// Flags (core workflow)
-	case "--new":
+	// Commands
+	case "--new", "new":
 		return cmdNew(args)
-	case "--list", "--ls":
+	case "--list", "--ls", "list":
 		return cmdList(args, false)
-	case "--list-others":
-		return cmdList(args, true)
-	case "--resume", "--switch":
+	case "--resume":
 		return cmdResume(args)
-	case "--check-queue":
-		return cmdCheckNext(args)
-
-	// Subcommands (management)
 	case "init":
 		return cmdInit(args, false)
 	case "reinit":
@@ -91,14 +85,16 @@ func Execute() error {
 		return cmdUninstall(args)
 	case "remove":
 		return cmdRemove(args)
-	case "clear":
-		return cmdClear(args)
+	case "purge":
+		return cmdPurge(args)
 
-	// Internal
-	case "new":
-		return cmdNew(args)
-	case "list":
-		return cmdList(args, false)
+	// Internal (used by shell wrapper and slash commands)
+	case "--switch":
+		return cmdResume(args)
+	case "--list-others":
+		return cmdList(args, true)
+	case "--check-queue":
+		return cmdCheckNext(args)
 	case "queue":
 		return cmdWriteNext(args)
 
@@ -278,7 +274,7 @@ func cmdResume(args []string) error {
 		case arg == "--no-launch":
 			noLaunch = true
 		case strings.HasPrefix(arg, "--"):
-			return fmt.Errorf("unknown flag for --resume: %s", arg)
+			return fmt.Errorf("unknown flag for resume: %s", arg)
 		default:
 			if name == "" {
 				name = arg
@@ -375,19 +371,20 @@ func cmdRemove(args []string) error {
 	return nil
 }
 
-func cmdClear(_ []string) error {
+func cmdPurge(_ []string) error {
 	root, cfg, err := requireInit()
 	if err != nil {
 		return err
 	}
 
 	if len(cfg.Mobs) == 0 {
-		fmt.Println("No mobs to clear.")
+		fmt.Println("No mobs to purge.")
 		return nil
 	}
 
-	fmt.Printf("This will remove all %d mob(s) and their worktrees.\n", len(cfg.Mobs))
-	fmt.Print("Are you sure? [y/N]: ")
+	fmt.Println()
+	fmt.Printf("  \033[38;2;255;69;58m● codemob\033[0m  This will remove all %d mob(s) and their worktrees.\n", len(cfg.Mobs))
+	fmt.Print("\n  Are you sure? [y/N]: ")
 
 	var input string
 	fmt.Scanln(&input)
@@ -410,7 +407,9 @@ func cmdClear(_ []string) error {
 		return err
 	}
 
-	mobStatus("All mobs cleared")
+	fmt.Println()
+	fmt.Printf("  \033[38;2;255;69;58m● codemob\033[0m  All mobs purged\n")
+	fmt.Println()
 	return nil
 }
 
@@ -710,17 +709,14 @@ func printUsage() {
 	fmt.Println("")
 	fmt.Println("Usage: codemob <command>")
 	fmt.Println("")
-	fmt.Println("Workflow:")
+	fmt.Println("Commands:")
 	fmt.Println("  --new [name]       Create a new mob and launch agent")
 	fmt.Println("  --list             List all mobs")
 	fmt.Println("  --resume <name>    Resume a mob (launch agent in worktree)")
-	fmt.Println("  --switch <name>    Alias for --resume")
-	fmt.Println("")
-	fmt.Println("Management:")
 	fmt.Println("  init               Initialize codemob (global + repo setup)")
 	fmt.Println("  reinit             Re-run initialization (idempotent)")
 	fmt.Println("  remove <name>      Remove a mob")
-	fmt.Println("  clear              Remove all mobs")
+	fmt.Println("  purge              Remove all mobs")
 	fmt.Println("  uninstall          Remove all codemob setup")
 	fmt.Println("")
 	fmt.Println("Options:")
