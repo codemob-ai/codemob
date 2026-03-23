@@ -10,7 +10,7 @@ mob() {
 
 claude() {
   case "${1:-}" in
-    --new-mob|--new-codemob)             shift; codemob --new --agent claude "$@"; return $? ;;
+    --mob|--codemob|--new-mob|--new-codemob) shift; codemob --new --agent claude "$@"; return $? ;;
     --resume-mob|--resume-codemob)       shift; codemob --resume "$@"; return $? ;;
     --switch-mob|--switch-codemob)       shift; codemob --switch "$@"; return $? ;;
     --list-mob|--list-mobs|--list-codemob|--list-codemobs) shift; codemob --list "$@"; return $? ;;
@@ -25,7 +25,7 @@ claude() {
 
 codex() {
   case "${1:-}" in
-    --new-mob|--new-codemob)             shift; codemob --new --agent codex "$@"; return $? ;;
+    --mob|--codemob|--new-mob|--new-codemob) shift; codemob --new --agent codex "$@"; return $? ;;
     --resume-mob|--resume-codemob)       shift; codemob --resume "$@"; return $? ;;
     --switch-mob|--switch-codemob)       shift; codemob --switch "$@"; return $? ;;
     --list-mob|--list-mobs|--list-codemob|--list-codemobs) shift; codemob --list "$@"; return $? ;;

@@ -34,16 +34,34 @@ func repoRoot(t *testing.T) string {
 }
 
 // setupTestRepo creates a temp HOME and a git repo inside it, returns (home, repoPath).
+// It also places a fake "claude" stub on PATH so that codemob init succeeds
+// in CI environments where the real agent binaries aren't installed.
 func setupTestRepo(t *testing.T) (string, string) {
 	t.Helper()
 
 	tmpHome := t.TempDir()
 	t.Setenv("HOME", tmpHome)
 
+	// Create a fake claude binary that satisfies checkDependencies:
+	//   --version → prints a version string
+	//   auth status --json → prints {"loggedIn":true}
+	stubDir := filepath.Join(tmpHome, "bin")
+	os.MkdirAll(stubDir, 0755)
+	stubPath := filepath.Join(stubDir, "claude")
+	stubScript := `#!/bin/sh
+case "$1" in
+  --version) echo "claude-stub 0.0.0" ;;
+  auth) echo '{"loggedIn":true}' ;;
+  *) exit 0 ;;
+esac
+`
+	os.WriteFile(stubPath, []byte(stubScript), 0755)
+	t.Setenv("PATH", stubDir+":"+os.Getenv("PATH"))
+
 	repoPath := filepath.Join(tmpHome, "test-repo")
 	os.MkdirAll(repoPath, 0755)
 
-	run(t, repoPath, "git", "init")
+	run(t, repoPath, "git", "init", "-b", "main")
 	run(t, repoPath, "git", "config", "user.email", "test@codemob.ai")
 	run(t, repoPath, "git", "config", "user.name", "codemob-test")
 	run(t, repoPath, "git", "commit", "--allow-empty", "-m", "init")
@@ -162,6 +180,50 @@ func TestInit(t *testing.T) {
 	// then -> global gitignore should contain codemob command patterns
 	if !strings.Contains(string(data), "mob-*.md") {
 		t.Error("global gitignore does not contain mob-*.md pattern")
+	}
+}
+
+func TestSlashCommandsReferenceValidCommands(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	commandsDir := filepath.Join(repoPath, ".claude", "commands")
+
+	// given -> expected codemob commands that each slash command should contain
+	expected := map[string][]string{
+		"mob-list.md":   {"codemob --list"},
+		"mob-new.md":    {"codemob queue new"},
+		"mob-switch.md": {"codemob --list-others", "codemob queue switch"},
+		"mob-remove.md": {"codemob --list", "codemob remove", "codemob queue remove"},
+	}
+
+	for file, commands := range expected {
+		// when -> read slash command content
+		content, err := os.ReadFile(filepath.Join(commandsDir, file))
+		if err != nil {
+			t.Fatalf("could not read %s: %v", file, err)
+		}
+
+		// then -> each expected command should appear in the content
+		for _, cmd := range commands {
+			if !strings.Contains(string(content), cmd) {
+				t.Errorf("%s: expected to find %q in content", file, cmd)
+			}
+		}
+	}
+
+	// then -> codemob-* variants should have identical content to mob-* variants
+	for mobFile := range expected {
+		codemobFile := strings.Replace(mobFile, "mob-", "codemob-", 1)
+		mobContent, _ := os.ReadFile(filepath.Join(commandsDir, mobFile))
+		codemobContent, err := os.ReadFile(filepath.Join(commandsDir, codemobFile))
+		if err != nil {
+			t.Fatalf("could not read %s: %v", codemobFile, err)
+		}
+		if string(mobContent) != string(codemobContent) {
+			t.Errorf("%s and %s have different content", mobFile, codemobFile)
+		}
 	}
 }
 
@@ -539,17 +601,17 @@ func TestListOthersExcludesCurrent(t *testing.T) {
 	}
 }
 
-// ─── Clear ───────────────────────────────────────────────────────────────────
+// ─── Purge ───────────────────────────────────────────────────────────────────
 
-func TestClear(t *testing.T) {
+func TestPurge(t *testing.T) {
 	bin := buildCore(t)
 	_, repoPath := setupTestRepo(t)
 	initRepo(t, bin, repoPath)
 	runCore(t, bin, repoPath, "--new", "one", "--no-launch")
 	runCore(t, bin, repoPath, "--new", "two", "--no-launch")
 
-	// when -> clear with "y" confirmation
-	cmd := exec.Command(bin, "clear")
+	// when -> purge with "y" confirmation
+	cmd := exec.Command(bin, "purge")
 	cmd.Dir = repoPath
 	cmd.Stdin = strings.NewReader("y\n")
 	out, err := cmd.CombinedOutput()
@@ -561,15 +623,15 @@ func TestClear(t *testing.T) {
 	cfg := readConfig(t, repoPath)
 	mobs, _ := cfg["mobs"].([]interface{})
 	if len(mobs) != 0 {
-		t.Errorf("expected 0 mobs after clear, got %d", len(mobs))
+		t.Errorf("expected 0 mobs after purge, got %d", len(mobs))
 	}
 
 	// then -> worktrees should be gone
 	if _, err := os.Stat(filepath.Join(repoPath, ".codemob", "mobs", "one")); err == nil {
-		t.Error("worktree 'one' still exists after clear")
+		t.Error("worktree 'one' still exists after purge")
 	}
 	if _, err := os.Stat(filepath.Join(repoPath, ".codemob", "mobs", "two")); err == nil {
-		t.Error("worktree 'two' still exists after clear")
+		t.Error("worktree 'two' still exists after purge")
 	}
 }
 

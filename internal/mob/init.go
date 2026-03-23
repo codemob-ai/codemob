@@ -154,12 +154,12 @@ func Init(installDir string, forceReprompt bool) error {
 
 	fmt.Println()
 	fmt.Println("Repo setup:")
-	bothReady := claude.authenticated && codex.authenticated
+	bothReady := claude.installed && codex.installed
 	repoRoot := setupRepo(forceReprompt)
-	if claude.authenticated {
+	if claude.installed {
 		setupClaudeCommands(repoRoot, bothReady)
 	}
-	if codex.authenticated {
+	if codex.installed {
 		setupCodexPrompts(bothReady)
 	}
 
