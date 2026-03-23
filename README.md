@@ -108,9 +108,9 @@ make install    # builds and copies to /opt/homebrew
 codemob init
 ```
 
-`codemob` and `mob` are interchangeable — use whichever you prefer.
-
 ## Usage
+
+`codemob` and `mob` are interchangeable — use whichever you prefer.
 
 ```bash
 # start
@@ -135,13 +135,13 @@ Shell aliases (`claude --new-mob`, `codex --new-mob`, `mob --new`) also work aft
 
 | Command | |
 |---|---|
-| `/mob-list` | List mobs |
-| `/mob-new` | Create mob (launches after exit) |
-| `/mob-switch` | Switch mob (launches after exit) |
-| `/mob-change-agent` | Swap agent (claude <-> codex) |
-| `/mob-remove` | Remove mob |
+| `/codemob-list` | List mobs |
+| `/codemob-new` | Create mob (launches after exit) |
+| `/codemob-switch` | Switch mob (launches after exit) |
+| `/codemob-change-agent` | Swap agent (claude <-> codex) |
+| `/codemob-remove` | Remove mob |
 
-Also available as `/codemob-*`.
+Also available as `/mob-*`.
 
 ## How it works
 
