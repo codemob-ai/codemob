@@ -20,7 +20,7 @@ type commandDef struct {
 var slashCommandDefs = map[string]commandDef{
 	"list": {
 		Description: "List all codemob workspaces and their status",
-		Body:        "Run exactly this command using the Bash tool: codemob --list\n\nDo NOT use go run, do NOT cd anywhere. Just run: codemob --list\n\nDisplay the output to the user.\n",
+		Body:        "Run exactly this command using the Bash tool: codemob list\n\nDo NOT use go run, do NOT cd anywhere. Just run: codemob list\n\nDisplay the output to the user.\n",
 	},
 	"new": {
 		Description: "Create a new codemob workspace",
@@ -36,7 +36,7 @@ Then tell the user: "New mob queued. Exit this session (Ctrl+C) and codemob will
 	},
 	"switch": {
 		Description: "Switch to a different codemob workspace",
-		Body: `Run ` + "`codemob --list-others`" + ` using the Bash tool.
+		Body: `Run ` + "`codemob list-others`" + ` using the Bash tool.
 
 If the output says "No mobs", tell the user there are no other mobs to switch to and suggest using /mob-new or /codemob-new to create one.
 
@@ -60,7 +60,7 @@ Then tell the user: "Agent switch queued. Exit this session (Ctrl+C) and codemob
 	},
 	"remove": {
 		Description: "Remove a codemob workspace",
-		Body: `Run ` + "`codemob --list`" + ` using the Bash tool and display the results.
+		Body: `Run ` + "`codemob list`" + ` using the Bash tool and display the results.
 
 Determine the current mob by checking if the working directory contains ` + "`.codemob/mobs/`" + ` — if so, extract the mob name from the path.
 

@@ -27,9 +27,9 @@ Two layers:
 
 Commands:
 ```
-codemob --new [name]        # create mob + launch agent
-codemob --resume <name>     # resume a mob (launch agent in worktree)
-codemob --list              # list all mobs
+codemob new [name]          # create mob + launch agent
+codemob resume [name]       # resume a mob (launch agent in worktree)
+codemob list                # list all mobs
 codemob init                # first-time setup (global + repo)
 codemob reinit              # alias for init (idempotent)
 codemob remove <name>       # remove a mob (accepts name or index)
@@ -47,11 +47,11 @@ Options:
 
 Claude/Codex wrappers (installed by init):
 ```
-claude --mob [name]         # → codemob --new --agent claude [name]
+claude --mob [name]         # → codemob new --agent claude [name]
 claude --new-mob [name]     # same as --mob
-claude --resume-mob <name>  # → codemob --resume <name>
-codex --mob [name]          # → codemob --new --agent codex [name]
-codex --resume-mob <name>   # → codemob --resume <name>
+claude --resume-mob <name>  # → codemob resume <name>
+codex --mob [name]          # → codemob new --agent codex [name]
+codex --resume-mob <name>   # → codemob resume <name>
 ```
 
 ## Build
@@ -115,7 +115,7 @@ The Go binary is the primary interface — it handles everything including agent
 
 `codemob-shell.sh` sets `$CODEMOB_SESSION` (a UUID) once per terminal window at shell startup. The Go binary uses this as a file key under `.codemob/sessions/<uuid>` to track the last active mob per terminal.
 
-This enables `codemob --resume` (no name) to default to the last-used mob in that terminal — even with parallel sessions in different terminals.
+This enables `codemob resume` (no name) to default to the last-used mob in that terminal — even with parallel sessions in different terminals.
 
 **How it works:**
 - `writeLastMob()` in `launchAgent` writes the mob name on normal exit

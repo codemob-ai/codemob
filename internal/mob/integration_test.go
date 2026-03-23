@@ -192,10 +192,10 @@ func TestSlashCommandsReferenceValidCommands(t *testing.T) {
 
 	// given -> expected codemob commands that each slash command should contain
 	expected := map[string][]string{
-		"mob-list.md":   {"codemob --list"},
+		"mob-list.md":   {"codemob list"},
 		"mob-new.md":    {"codemob queue new"},
-		"mob-switch.md": {"codemob --list-others", "codemob queue switch"},
-		"mob-remove.md": {"codemob --list", "codemob remove", "codemob queue remove"},
+		"mob-switch.md": {"codemob list-others", "codemob queue switch"},
+		"mob-remove.md": {"codemob list", "codemob remove", "codemob queue remove"},
 		"mob-drop.md":   {"codemob queue remove"},
 	}
 
@@ -251,7 +251,7 @@ func TestNewMob(t *testing.T) {
 	initRepo(t, bin, repoPath)
 
 	// when
-	out := runCore(t, bin, repoPath, "--new", "test-feature", "--no-launch")
+	out := runCore(t, bin, repoPath, "new", "test-feature", "--no-launch")
 
 	// then -> output should confirm creation
 	if !strings.Contains(out, "test-feature") {
@@ -288,7 +288,7 @@ func TestNewMobAutoName(t *testing.T) {
 	initRepo(t, bin, repoPath)
 
 	// when -> no name provided
-	runCore(t, bin, repoPath, "--new", "--no-launch")
+	runCore(t, bin, repoPath, "new", "--no-launch")
 
 	// then -> config should have exactly one mob with an adjective-fruit name
 	cfg := readConfig(t, repoPath)
@@ -308,10 +308,10 @@ func TestNewMobDuplicateName(t *testing.T) {
 	initRepo(t, bin, repoPath)
 
 	// given -> create a mob
-	runCore(t, bin, repoPath, "--new", "dupe-test", "--no-launch")
+	runCore(t, bin, repoPath, "new", "dupe-test", "--no-launch")
 
 	// when -> try to create another with the same name
-	out := runCoreExpectError(t, bin, repoPath, "--new", "dupe-test", "--no-launch")
+	out := runCoreExpectError(t, bin, repoPath, "new", "dupe-test", "--no-launch")
 
 	// then
 	if !strings.Contains(out, "already exists") {
@@ -325,7 +325,7 @@ func TestListMobs(t *testing.T) {
 	initRepo(t, bin, repoPath)
 
 	// given -> no mobs
-	out := runCore(t, bin, repoPath, "--list")
+	out := runCore(t, bin, repoPath, "list")
 
 	// then
 	if !strings.Contains(out, "No mobs") {
@@ -333,11 +333,11 @@ func TestListMobs(t *testing.T) {
 	}
 
 	// given -> create two mobs
-	runCore(t, bin, repoPath, "--new", "alpha", "--no-launch")
-	runCore(t, bin, repoPath, "--new", "beta", "--no-launch")
+	runCore(t, bin, repoPath, "new", "alpha", "--no-launch")
+	runCore(t, bin, repoPath, "new", "beta", "--no-launch")
 
 	// when
-	out = runCore(t, bin, repoPath, "--list")
+	out = runCore(t, bin, repoPath, "list")
 
 	// then
 	if !strings.Contains(out, "alpha") {
@@ -355,10 +355,10 @@ func TestResumeMob(t *testing.T) {
 	bin := buildCore(t)
 	_, repoPath := setupTestRepo(t)
 	initRepo(t, bin, repoPath)
-	runCore(t, bin, repoPath, "--new", "resume-test", "--no-launch")
+	runCore(t, bin, repoPath, "new", "resume-test", "--no-launch")
 
 	// when
-	out := runCore(t, bin, repoPath, "--resume", "resume-test", "--no-launch")
+	out := runCore(t, bin, repoPath, "resume", "resume-test", "--no-launch")
 
 	// then -> should mention the mob name
 	if !strings.Contains(out, "resume-test") {
@@ -372,7 +372,7 @@ func TestResumeNotFound(t *testing.T) {
 	initRepo(t, bin, repoPath)
 
 	// when
-	out := runCoreExpectError(t, bin, repoPath, "--resume", "nonexistent", "--no-launch")
+	out := runCoreExpectError(t, bin, repoPath, "resume", "nonexistent", "--no-launch")
 
 	// then
 	if !strings.Contains(out, "not found") {
@@ -384,7 +384,7 @@ func TestRemoveMob(t *testing.T) {
 	bin := buildCore(t)
 	_, repoPath := setupTestRepo(t)
 	initRepo(t, bin, repoPath)
-	runCore(t, bin, repoPath, "--new", "remove-me", "--no-launch")
+	runCore(t, bin, repoPath, "new", "remove-me", "--no-launch")
 
 	// when
 	out := runCore(t, bin, repoPath, "remove", "remove-me")
@@ -412,13 +412,13 @@ func TestReconciliation(t *testing.T) {
 	bin := buildCore(t)
 	_, repoPath := setupTestRepo(t)
 	initRepo(t, bin, repoPath)
-	runCore(t, bin, repoPath, "--new", "orphan", "--no-launch")
+	runCore(t, bin, repoPath, "new", "orphan", "--no-launch")
 
 	// given -> manually remove the worktree outside of codemob
 	run(t, repoPath, "git", "worktree", "remove", filepath.Join(".codemob", "mobs", "orphan"))
 
 	// when -> list (triggers reconciliation)
-	out := runCore(t, bin, repoPath, "--list")
+	out := runCore(t, bin, repoPath, "list")
 
 	// then -> orphan should be cleaned from config
 	if !strings.Contains(out, "No mobs") {
@@ -437,11 +437,11 @@ func TestRepoRootFromInsideWorktree(t *testing.T) {
 	bin := buildCore(t)
 	_, repoPath := setupTestRepo(t)
 	initRepo(t, bin, repoPath)
-	runCore(t, bin, repoPath, "--new", "nested-test", "--no-launch")
+	runCore(t, bin, repoPath, "new", "nested-test", "--no-launch")
 
 	// when -> run list from inside the mob worktree
 	worktreePath := filepath.Join(repoPath, ".codemob", "mobs", "nested-test")
-	out := runCore(t, bin, worktreePath, "--list")
+	out := runCore(t, bin, worktreePath, "list")
 
 	// then -> should work and show the mob
 	if !strings.Contains(out, "nested-test") {
@@ -455,7 +455,7 @@ func TestUninitializedRepo(t *testing.T) {
 	// do NOT run init
 
 	// when
-	out := runCoreExpectError(t, bin, repoPath, "--list")
+	out := runCoreExpectError(t, bin, repoPath, "list")
 
 	// then
 	if !strings.Contains(out, "not initialized") {
@@ -471,7 +471,7 @@ func TestNameValidation_Uppercase(t *testing.T) {
 	initRepo(t, bin, repoPath)
 
 	// when -> uppercase name
-	runCore(t, bin, repoPath, "--new", "MyFeature", "--no-launch")
+	runCore(t, bin, repoPath, "new", "MyFeature", "--no-launch")
 
 	// then -> should work
 	cfg := readConfig(t, repoPath)
@@ -490,7 +490,7 @@ func TestNameValidation_AllNumericRejected(t *testing.T) {
 	initRepo(t, bin, repoPath)
 
 	// when -> all-numeric name
-	out := runCoreExpectError(t, bin, repoPath, "--new", "123", "--no-launch")
+	out := runCoreExpectError(t, bin, repoPath, "new", "123", "--no-launch")
 
 	// then
 	if !strings.Contains(out, "numeric") {
@@ -505,7 +505,7 @@ func TestNameValidation_TooLong(t *testing.T) {
 
 	// when -> 61 char name
 	longName := strings.Repeat("a", 61)
-	out := runCoreExpectError(t, bin, repoPath, "--new", longName, "--no-launch")
+	out := runCoreExpectError(t, bin, repoPath, "new", longName, "--no-launch")
 
 	// then
 	if !strings.Contains(out, "too long") {
@@ -519,7 +519,7 @@ func TestNameValidation_LeadingHyphen(t *testing.T) {
 	initRepo(t, bin, repoPath)
 
 	// when
-	out := runCoreExpectError(t, bin, repoPath, "--new", "-bad", "--no-launch")
+	out := runCoreExpectError(t, bin, repoPath, "new", "-bad", "--no-launch")
 
 	// then
 	if !strings.Contains(out, "hyphen") {
@@ -533,7 +533,7 @@ func TestNameValidation_SpecialChars(t *testing.T) {
 	initRepo(t, bin, repoPath)
 
 	// when
-	out := runCoreExpectError(t, bin, repoPath, "--new", "foo/bar", "--no-launch")
+	out := runCoreExpectError(t, bin, repoPath, "new", "foo/bar", "--no-launch")
 
 	// then
 	if !strings.Contains(out, "letters") {
@@ -547,11 +547,11 @@ func TestResumeByIndex(t *testing.T) {
 	bin := buildCore(t)
 	_, repoPath := setupTestRepo(t)
 	initRepo(t, bin, repoPath)
-	runCore(t, bin, repoPath, "--new", "alpha", "--no-launch")
-	runCore(t, bin, repoPath, "--new", "beta", "--no-launch")
+	runCore(t, bin, repoPath, "new", "alpha", "--no-launch")
+	runCore(t, bin, repoPath, "new", "beta", "--no-launch")
 
 	// when -> resume by index
-	out := runCore(t, bin, repoPath, "--resume", "2", "--no-launch")
+	out := runCore(t, bin, repoPath, "resume", "2", "--no-launch")
 
 	// then -> should mention beta
 	if !strings.Contains(out, "beta") {
@@ -563,8 +563,8 @@ func TestRemoveByIndex(t *testing.T) {
 	bin := buildCore(t)
 	_, repoPath := setupTestRepo(t)
 	initRepo(t, bin, repoPath)
-	runCore(t, bin, repoPath, "--new", "first", "--no-launch")
-	runCore(t, bin, repoPath, "--new", "second", "--no-launch")
+	runCore(t, bin, repoPath, "new", "first", "--no-launch")
+	runCore(t, bin, repoPath, "new", "second", "--no-launch")
 
 	// when -> remove by index
 	runCore(t, bin, repoPath, "remove", "1")
@@ -586,12 +586,12 @@ func TestListOthersExcludesCurrent(t *testing.T) {
 	bin := buildCore(t)
 	_, repoPath := setupTestRepo(t)
 	initRepo(t, bin, repoPath)
-	runCore(t, bin, repoPath, "--new", "mob-a", "--no-launch")
-	runCore(t, bin, repoPath, "--new", "mob-b", "--no-launch")
+	runCore(t, bin, repoPath, "new", "mob-a", "--no-launch")
+	runCore(t, bin, repoPath, "new", "mob-b", "--no-launch")
 
 	// when -> list-others from inside mob-a
 	worktreeA := filepath.Join(repoPath, ".codemob", "mobs", "mob-a")
-	out := runCore(t, bin, worktreeA, "--list-others")
+	out := runCore(t, bin, worktreeA, "list-others")
 
 	// then -> should show mob-b but not mob-a
 	if strings.Contains(out, "mob-a") {
@@ -608,8 +608,8 @@ func TestPurge(t *testing.T) {
 	bin := buildCore(t)
 	_, repoPath := setupTestRepo(t)
 	initRepo(t, bin, repoPath)
-	runCore(t, bin, repoPath, "--new", "one", "--no-launch")
-	runCore(t, bin, repoPath, "--new", "two", "--no-launch")
+	runCore(t, bin, repoPath, "new", "one", "--no-launch")
+	runCore(t, bin, repoPath, "new", "two", "--no-launch")
 
 	// when -> purge with "y" confirmation
 	cmd := exec.Command(bin, "purge")
@@ -633,6 +633,94 @@ func TestPurge(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(repoPath, ".codemob", "mobs", "two")); err == nil {
 		t.Error("worktree 'two' still exists after purge")
+	}
+}
+
+// ─── Session Cleanup ─────────────────────────────────────────────────────────
+
+func TestRemoveCleansSessionFiles(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "target", "--no-launch")
+	runCore(t, bin, repoPath, "new", "other", "--no-launch")
+
+	// given -> two sessions pointing to target, one to other
+	writeSessionFile(t, repoPath, "sess-a", "target")
+	writeSessionFile(t, repoPath, "sess-b", "target")
+	writeSessionFile(t, repoPath, "sess-c", "other")
+
+	// when -> remove target
+	runCore(t, bin, repoPath, "remove", "target")
+
+	// then -> session files for target should be gone
+	sessDir := filepath.Join(repoPath, ".codemob", "sessions")
+	if _, err := os.Stat(filepath.Join(sessDir, "sess-a")); err == nil {
+		t.Error("session file sess-a still exists after removing target")
+	}
+	if _, err := os.Stat(filepath.Join(sessDir, "sess-b")); err == nil {
+		t.Error("session file sess-b still exists after removing target")
+	}
+
+	// then -> session file for other should remain
+	if _, err := os.Stat(filepath.Join(sessDir, "sess-c")); err != nil {
+		t.Error("session file sess-c was incorrectly removed")
+	}
+}
+
+func TestPurgeCleansSessionFiles(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "one", "--no-launch")
+	runCore(t, bin, repoPath, "new", "two", "--no-launch")
+
+	// given -> session files exist
+	writeSessionFile(t, repoPath, "sess-x", "one")
+	writeSessionFile(t, repoPath, "sess-y", "two")
+
+	// when -> purge
+	cmd := exec.Command(bin, "purge")
+	cmd.Dir = repoPath
+	cmd.Stdin = strings.NewReader("y\n")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("purge failed: %s\n%s", err, out)
+	}
+
+	// then -> sessions directory should be gone
+	sessDir := filepath.Join(repoPath, ".codemob", "sessions")
+	if _, err := os.Stat(sessDir); err == nil {
+		t.Error("sessions directory still exists after purge")
+	}
+}
+
+func TestReconcileCleansSessionFiles(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "orphan", "--no-launch")
+	runCore(t, bin, repoPath, "new", "alive", "--no-launch")
+
+	// given -> session files for both mobs
+	writeSessionFile(t, repoPath, "sess-orphan", "orphan")
+	writeSessionFile(t, repoPath, "sess-alive", "alive")
+
+	// given -> manually remove orphan's worktree (simulates external deletion)
+	run(t, repoPath, "git", "worktree", "remove", filepath.Join(".codemob", "mobs", "orphan"))
+
+	// when -> list triggers reconciliation
+	runCore(t, bin, repoPath, "list")
+
+	// then -> session file for orphan should be cleaned up
+	sessDir := filepath.Join(repoPath, ".codemob", "sessions")
+	if _, err := os.Stat(filepath.Join(sessDir, "sess-orphan")); err == nil {
+		t.Error("session file for orphan still exists after reconciliation")
+	}
+
+	// then -> session file for alive should remain
+	if _, err := os.Stat(filepath.Join(sessDir, "sess-alive")); err != nil {
+		t.Error("session file for alive was incorrectly removed")
 	}
 }
 
@@ -674,7 +762,7 @@ func TestAgentMissingValue(t *testing.T) {
 	initRepo(t, bin, repoPath)
 
 	// when -> --agent with no value
-	out := runCoreExpectError(t, bin, repoPath, "--new", "--agent")
+	out := runCoreExpectError(t, bin, repoPath, "new", "--agent")
 
 	// then
 	if !strings.Contains(out, "--agent requires") {
@@ -686,10 +774,10 @@ func TestResumeRejectsUnknownFlags(t *testing.T) {
 	bin := buildCore(t)
 	_, repoPath := setupTestRepo(t)
 	initRepo(t, bin, repoPath)
-	runCore(t, bin, repoPath, "--new", "test-mob", "--no-launch")
+	runCore(t, bin, repoPath, "new", "test-mob", "--no-launch")
 
 	// when -> --agent passed to --resume
-	out := runCoreExpectError(t, bin, repoPath, "--resume", "--agent", "codex")
+	out := runCoreExpectError(t, bin, repoPath, "resume", "--agent", "codex")
 
 	// then
 	if !strings.Contains(out, "unknown flag") {
@@ -724,14 +812,14 @@ func TestResumeDefaultsToSessionLastMob(t *testing.T) {
 	bin := buildCore(t)
 	_, repoPath := setupTestRepo(t)
 	initRepo(t, bin, repoPath)
-	runCore(t, bin, repoPath, "--new", "alpha", "--no-launch")
-	runCore(t, bin, repoPath, "--new", "beta", "--no-launch")
+	runCore(t, bin, repoPath, "new", "alpha", "--no-launch")
+	runCore(t, bin, repoPath, "new", "beta", "--no-launch")
 
 	// given -> session file points to beta
 	writeSessionFile(t, repoPath, "sess-1", "beta")
 
 	// when -> resume with empty input (should use session default)
-	out, err := runCoreWithSession(t, bin, repoPath, "sess-1", "\n", "--resume", "--no-launch")
+	out, err := runCoreWithSession(t, bin, repoPath, "sess-1", "\n", "resume", "--no-launch")
 
 	// then -> should resume beta
 	if err != nil {
@@ -746,14 +834,14 @@ func TestResumeShowsLastMobMarker(t *testing.T) {
 	bin := buildCore(t)
 	_, repoPath := setupTestRepo(t)
 	initRepo(t, bin, repoPath)
-	runCore(t, bin, repoPath, "--new", "alpha", "--no-launch")
-	runCore(t, bin, repoPath, "--new", "beta", "--no-launch")
+	runCore(t, bin, repoPath, "new", "alpha", "--no-launch")
+	runCore(t, bin, repoPath, "new", "beta", "--no-launch")
 
 	// given -> session file points to alpha
 	writeSessionFile(t, repoPath, "sess-2", "alpha")
 
 	// when -> resume by explicit name (we still see the picker output)
-	out, err := runCoreWithSession(t, bin, repoPath, "sess-2", "beta\n", "--resume", "--no-launch")
+	out, err := runCoreWithSession(t, bin, repoPath, "sess-2", "beta\n", "resume", "--no-launch")
 
 	// then -> output should show ◀ marker next to alpha
 	if err != nil {
@@ -771,15 +859,15 @@ func TestResumeIgnoresRemovedMobInSession(t *testing.T) {
 	bin := buildCore(t)
 	_, repoPath := setupTestRepo(t)
 	initRepo(t, bin, repoPath)
-	runCore(t, bin, repoPath, "--new", "temp", "--no-launch")
-	runCore(t, bin, repoPath, "--new", "keeper", "--no-launch")
+	runCore(t, bin, repoPath, "new", "temp", "--no-launch")
+	runCore(t, bin, repoPath, "new", "keeper", "--no-launch")
 
 	// given -> session points to temp, but we remove it
 	writeSessionFile(t, repoPath, "sess-3", "temp")
 	runCore(t, bin, repoPath, "remove", "temp")
 
 	// when -> resume with empty input (session mob is gone, only one mob left)
-	out, err := runCoreWithSession(t, bin, repoPath, "sess-3", "", "--resume", "--no-launch")
+	out, err := runCoreWithSession(t, bin, repoPath, "sess-3", "", "resume", "--no-launch")
 
 	// then -> should auto-select the only remaining mob (keeper)
 	if err != nil {
@@ -794,15 +882,15 @@ func TestSessionIsolation(t *testing.T) {
 	bin := buildCore(t)
 	_, repoPath := setupTestRepo(t)
 	initRepo(t, bin, repoPath)
-	runCore(t, bin, repoPath, "--new", "mob-a", "--no-launch")
-	runCore(t, bin, repoPath, "--new", "mob-b", "--no-launch")
+	runCore(t, bin, repoPath, "new", "mob-a", "--no-launch")
+	runCore(t, bin, repoPath, "new", "mob-b", "--no-launch")
 
 	// given -> two different sessions point to different mobs
 	writeSessionFile(t, repoPath, "terminal-1", "mob-a")
 	writeSessionFile(t, repoPath, "terminal-2", "mob-b")
 
 	// when -> resume from terminal-1
-	out1, err := runCoreWithSession(t, bin, repoPath, "terminal-1", "\n", "--resume", "--no-launch")
+	out1, err := runCoreWithSession(t, bin, repoPath, "terminal-1", "\n", "resume", "--no-launch")
 	if err != nil {
 		t.Fatalf("resume (terminal-1) failed: %v\n%s", err, out1)
 	}
@@ -813,7 +901,7 @@ func TestSessionIsolation(t *testing.T) {
 	}
 
 	// when -> resume from terminal-2
-	out2, err := runCoreWithSession(t, bin, repoPath, "terminal-2", "\n", "--resume", "--no-launch")
+	out2, err := runCoreWithSession(t, bin, repoPath, "terminal-2", "\n", "resume", "--no-launch")
 	if err != nil {
 		t.Fatalf("resume (terminal-2) failed: %v\n%s", err, out2)
 	}
@@ -828,10 +916,10 @@ func TestResumeWithoutSessionWorks(t *testing.T) {
 	bin := buildCore(t)
 	_, repoPath := setupTestRepo(t)
 	initRepo(t, bin, repoPath)
-	runCore(t, bin, repoPath, "--new", "no-session", "--no-launch")
+	runCore(t, bin, repoPath, "new", "no-session", "--no-launch")
 
 	// when -> resume with explicit name, no CODEMOB_SESSION set
-	out := runCore(t, bin, repoPath, "--resume", "no-session", "--no-launch")
+	out := runCore(t, bin, repoPath, "resume", "no-session", "--no-launch")
 
 	// then -> should work fine
 	if !strings.Contains(out, "Resuming mob 'no-session'") {
@@ -847,7 +935,7 @@ func TestNewMobWithCustomAgent(t *testing.T) {
 	initRepo(t, bin, repoPath)
 
 	// when
-	runCore(t, bin, repoPath, "--new", "codex-mob", "--agent", "codex", "--no-launch")
+	runCore(t, bin, repoPath, "new", "codex-mob", "--agent", "codex", "--no-launch")
 
 	// then -> config should reflect the agent
 	cfg := readConfig(t, repoPath)
@@ -855,5 +943,113 @@ func TestNewMobWithCustomAgent(t *testing.T) {
 	mob := mobs[0].(map[string]interface{})
 	if mob["agent"] != "codex" {
 		t.Errorf("expected agent=codex in config, got %v", mob["agent"])
+	}
+}
+
+// ─── Path ────────────────────────────────────────────────────────────────────
+
+func TestPathByName(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "path-test", "--no-launch")
+
+	// when
+	out := runCore(t, bin, repoPath, "path", "path-test")
+
+	// then
+	if !strings.HasSuffix(strings.TrimSpace(out), filepath.Join(".codemob", "mobs", "path-test")) {
+		t.Errorf("expected path ending in .codemob/mobs/path-test, got %q", strings.TrimSpace(out))
+	}
+}
+
+func TestPathByIndex(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "first", "--no-launch")
+	runCore(t, bin, repoPath, "new", "second", "--no-launch")
+
+	// when
+	out := runCore(t, bin, repoPath, "path", "2")
+
+	// then
+	if !strings.HasSuffix(strings.TrimSpace(out), filepath.Join(".codemob", "mobs", "second")) {
+		t.Errorf("expected path ending in .codemob/mobs/second, got %q", strings.TrimSpace(out))
+	}
+}
+
+func TestPathRoot(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	// when
+	out := runCore(t, bin, repoPath, "path", "root")
+
+	// then
+	if !strings.HasSuffix(strings.TrimSpace(out), "test-repo") {
+		t.Errorf("expected path ending in test-repo, got %q", strings.TrimSpace(out))
+	}
+}
+
+func TestPathRootWorksWithNoMobs(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	// given -> no mobs exist
+
+	// when
+	out := runCore(t, bin, repoPath, "path", "root")
+
+	// then
+	if !strings.HasSuffix(strings.TrimSpace(out), "test-repo") {
+		t.Errorf("expected path ending in test-repo, got %q", strings.TrimSpace(out))
+	}
+}
+
+func TestPathNotFound(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "exists", "--no-launch")
+
+	// when
+	out := runCoreExpectError(t, bin, repoPath, "path", "nonexistent")
+
+	// then
+	if !strings.Contains(out, "not found") {
+		t.Errorf("expected 'not found' error, got: %s", out)
+	}
+}
+
+func TestPathNoMobs(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	// given -> no mobs exist
+
+	// when
+	out := runCoreExpectError(t, bin, repoPath, "path")
+
+	// then
+	if !strings.Contains(out, "no mobs") {
+		t.Errorf("expected 'no mobs' error, got: %s", out)
+	}
+}
+
+func TestPathReservedName(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	// when -> try to create a mob named "root"
+	out := runCoreExpectError(t, bin, repoPath, "new", "root", "--no-launch")
+
+	// then
+	if !strings.Contains(out, "reserved") {
+		t.Errorf("expected 'reserved' error, got: %s", out)
 	}
 }

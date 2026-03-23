@@ -54,8 +54,8 @@ func (p *progress) Clear() {
 var Version = "dev"
 
 func Execute() error {
-	// Clear stale next action on every invocation (except --check-queue which reads it)
-	if len(os.Args) < 2 || os.Args[1] != "--check-queue" {
+	// Clear stale next action on every invocation (except check-queue which reads it)
+	if len(os.Args) < 2 || os.Args[1] != "check-queue" {
 		if root, err := mob.FindRepoRoot(); err == nil {
 			mob.ClearQueue(root)
 		}
@@ -71,11 +71,11 @@ func Execute() error {
 
 	switch cmd {
 	// Commands
-	case "--new", "new":
+	case "new":
 		return cmdNew(args)
-	case "--list", "--ls", "list":
+	case "list", "ls":
 		return cmdList(args, false)
-	case "--resume":
+	case "resume":
 		return cmdResume(args)
 	case "init":
 		return cmdInit(args, false)
@@ -87,25 +87,29 @@ func Execute() error {
 		return cmdRemove(args)
 	case "purge":
 		return cmdPurge(args)
+	case "path":
+		return cmdPath(args)
+	case "info":
+		return cmdInfo()
 
 	// Internal (used by shell wrapper and slash commands)
-	case "--switch":
+	case "switch":
 		return cmdResume(args)
-	case "--list-others":
+	case "list-others":
 		return cmdList(args, true)
-	case "--check-queue":
+	case "check-queue":
 		return cmdCheckNext(args)
 	case "queue":
 		return cmdWriteNext(args)
 
-	case "--version", "-v", "version":
+	case "version", "--version", "-v":
 		fmt.Printf("codemob %s\n", Version)
 		return nil
-	case "--help", "-h", "help":
+	case "help", "--help", "-h":
 		printUsage()
 		return nil
 	default:
-		return fmt.Errorf("unknown command: %s. Run 'codemob --help' for usage.", cmd)
+		return fmt.Errorf("unknown command: %s. Run 'codemob help' for usage.", cmd)
 	}
 }
 
@@ -151,8 +155,9 @@ func requireInit() (string, *mob.Config, error) {
 	if err != nil {
 		return "", nil, err
 	}
-	if mob.Reconcile(root, cfg) {
+	if removed := mob.Reconcile(root, cfg); len(removed) > 0 {
 		_ = mob.SaveConfig(root, cfg)
+		cleanSessionFiles(root, removed...)
 	}
 	return root, cfg, nil
 }
@@ -243,7 +248,7 @@ func cmdList(_ []string, excludeCurrent bool) error {
 	}
 
 	if len(mobs) == 0 {
-		fmt.Println("No mobs. Create one with: codemob --new <name>")
+		fmt.Println("No mobs. Create one with: codemob new <name>")
 		return nil
 	}
 
@@ -284,7 +289,7 @@ func cmdResume(args []string) error {
 
 	if name == "" {
 		if len(cfg.Mobs) == 0 {
-			return fmt.Errorf("no mobs. Create one with: codemob --new")
+			return fmt.Errorf("no mobs. Create one with: codemob new")
 		}
 		if len(cfg.Mobs) == 1 {
 			name = cfg.Mobs[0].Name
@@ -380,8 +385,34 @@ func cmdRemove(args []string) error {
 		return err
 	}
 
+	cleanSessionFiles(root, m.Name)
 	mobStatus(fmt.Sprintf("Removed mob '%s'", m.Name))
 	return nil
+}
+
+// cleanSessionFiles removes session files that point to any of the given mob names.
+func cleanSessionFiles(root string, names ...string) {
+	sessDir := filepath.Join(root, mob.CodemobDir, "sessions")
+	entries, err := os.ReadDir(sessDir)
+	if err != nil {
+		return
+	}
+	remove := make(map[string]bool, len(names))
+	for _, n := range names {
+		remove[n] = true
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(sessDir, e.Name()))
+		if err != nil {
+			continue
+		}
+		if remove[strings.TrimSpace(string(data))] {
+			os.Remove(filepath.Join(sessDir, e.Name()))
+		}
+	}
 }
 
 func cmdPurge(_ []string) error {
@@ -430,9 +461,67 @@ func cmdPurge(_ []string) error {
 		return err
 	}
 
+	os.RemoveAll(filepath.Join(root, mob.CodemobDir, "sessions"))
+
 	fmt.Println()
 	fmt.Printf("  %s● codemob%s  All mobs purged\n", r, rst)
 	fmt.Println()
+	return nil
+}
+
+func cmdPath(args []string) error {
+	root, cfg, err := requireInit()
+	if err != nil {
+		return err
+	}
+
+	name := ""
+	if len(args) > 0 {
+		name = args[0]
+	}
+
+	if name == "root" {
+		fmt.Println(root)
+		return nil
+	}
+
+	if len(cfg.Mobs) == 0 {
+		return fmt.Errorf("no mobs. Create one with: codemob new")
+	}
+
+	if name == "" {
+		if len(cfg.Mobs) == 1 && mob.CurrentMobName() == "" {
+			name = cfg.Mobs[0].Name
+		} else {
+			inMob := mob.CurrentMobName() != ""
+			w := tabwriter.NewWriter(os.Stderr, 0, 0, 2, ' ', 0)
+			fmt.Fprintln(w, "#\tNAME\tBRANCH\tLAST AGENT\tCREATED")
+			for i, m := range cfg.Mobs {
+				fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", i+1, m.Name, m.Branch, m.Agent, mob.RelativeTime(m.CreatedAt))
+			}
+			w.Flush()
+			if inMob {
+				fmt.Fprintf(os.Stderr, "\n  \033[38;2;100;180;220m> enter 0 to cd back to repo root\033[0m\n")
+			}
+			fmt.Fprint(os.Stderr, "\nWhich mob? (#/name): ")
+			fmt.Scanln(&name)
+		}
+		if name == "" {
+			return fmt.Errorf("no mob selected")
+		}
+	}
+
+	if name == "0" || name == "root" {
+		fmt.Println(root)
+		return nil
+	}
+
+	m := resolveMob(cfg, name)
+	if m == nil {
+		return fmt.Errorf("mob '%s' not found", name)
+	}
+
+	fmt.Println(filepath.Join(root, mob.MobsDir, m.Name))
 	return nil
 }
 
@@ -551,6 +640,7 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 		}
 		cfg.Mobs = remaining
 		_ = mob.SaveConfig(root, cfg)
+		cleanSessionFiles(root, m.Name)
 		mobStatus(fmt.Sprintf("Removed mob '%s'", m.Name))
 		return "", "", false, nil // no agent to launch
 
@@ -766,13 +856,15 @@ func printUsage() {
 	fmt.Println("Usage: codemob <command>")
 	fmt.Println("")
 	fmt.Println("Commands:")
-	fmt.Println("  --new [name]       Create a new mob and launch agent")
-	fmt.Println("  --list             List all mobs")
-	fmt.Println("  --resume <name>    Resume a mob (launch agent in worktree)")
+	fmt.Println("  new [name]         Create a new mob and launch agent")
+	fmt.Println("  list               List all mobs")
+	fmt.Println("  resume [name]      Resume a mob (launch agent in worktree)")
 	fmt.Println("  init               Initialize codemob (global + repo setup)")
 	fmt.Println("  reinit             Re-run initialization (idempotent)")
 	fmt.Println("  remove <name>      Remove a mob")
 	fmt.Println("  purge              Remove all mobs")
+	fmt.Println("  path [name]        Print worktree path (interactive if no name)")
+	fmt.Println("  info               Show diagnostic information")
 	fmt.Println("  uninstall          Remove all codemob setup")
 	fmt.Println("")
 	fmt.Println("Options:")
