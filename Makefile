@@ -17,6 +17,7 @@ install: build
 	@echo ""
 	@mkdir -p $(BINDIR) $(SHAREDIR)
 	@cp codemob $(BINDIR)/codemob
+	@xattr -cr $(BINDIR)/codemob 2>/dev/null || true
 	@cp codemob-shell.sh $(SHAREDIR)/codemob-shell.sh
 	@echo "  → $(BINDIR)/codemob"
 	@echo "  → $(SHAREDIR)/codemob-shell.sh"

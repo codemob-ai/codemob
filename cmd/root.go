@@ -17,7 +17,8 @@ import (
 
 func mobStatus(msg string) {
 	fmt.Println()
-	fmt.Printf("  \033[0;32m●\033[0m \033[1mcodemob\033[0m  %s\n", msg)
+	// Brand accent: #e7dc60
+	fmt.Printf("  \033[38;2;231;220;96m● codemob\033[0m  %s\n", msg)
 	fmt.Println()
 }
 
@@ -217,10 +218,15 @@ func cmdList(_ []string, excludeCurrent bool) error {
 		return nil
 	}
 
+	currentMob := mob.CurrentMobName()
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "#\tNAME\tBRANCH\tLAST AGENT\tCREATED")
 	for i, m := range mobs {
-		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", i+1, m.Name, m.Branch, m.Agent, mob.RelativeTime(m.CreatedAt))
+		marker := ""
+		if m.Name == currentMob {
+			marker = " ◀"
+		}
+		fmt.Fprintf(w, "%d\t%s%s\t%s\t%s\t%s\n", i+1, m.Name, marker, m.Branch, m.Agent, mob.RelativeTime(m.CreatedAt))
 	}
 	w.Flush()
 	return nil
@@ -328,7 +334,7 @@ func cmdRemove(args []string) error {
 		return err
 	}
 
-	fmt.Printf("Removed mob '%s'\n", m.Name)
+	mobStatus(fmt.Sprintf("Removed mob '%s'", m.Name))
 	return nil
 }
 
@@ -367,7 +373,7 @@ func cmdClear(_ []string) error {
 		return err
 	}
 
-	fmt.Println("All mobs cleared.")
+	mobStatus("All mobs cleared")
 	return nil
 }
 
@@ -480,7 +486,7 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 		}
 		cfg.Mobs = remaining
 		_ = mob.SaveConfig(root, cfg)
-		fmt.Printf("Removed mob '%s'\n", name)
+		mobStatus(fmt.Sprintf("Removed mob '%s'", m.Name))
 		return "", "", false, nil // no agent to launch
 
 	default:
