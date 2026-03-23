@@ -501,19 +501,28 @@ func setupRepo() string {
 	// Detect base branch
 	defaultBranch := gitutil.DetectDefaultBranch(root)
 
-	// Prompt
+	// Prompt for base branch
 	fmt.Println()
-	fmt.Printf("Base branch for new mobs [%s]: ", defaultBranch)
 	reader := bufio.NewReader(os.Stdin)
+	fmt.Printf("Base branch for new mobs [%s]: ", defaultBranch)
 	input, _ := reader.ReadString('\n')
 	input = strings.TrimSpace(input)
 	if input != "" {
 		defaultBranch = input
 	}
 
+	// Prompt for default agent
+	defaultAgent := "claude"
+	fmt.Printf("Default agent (claude/codex) [%s]: ", defaultAgent)
+	agentInput, _ := reader.ReadString('\n')
+	agentInput = strings.TrimSpace(agentInput)
+	if agentInput != "" {
+		defaultAgent = agentInput
+	}
+
 	// Create config
 	cfg := Config{
-		DefaultAgent: "claude",
+		DefaultAgent: defaultAgent,
 		BaseBranch:   defaultBranch,
 		Mobs:         []Mob{},
 	}

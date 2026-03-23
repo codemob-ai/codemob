@@ -51,12 +51,12 @@ func setupTestRepo(t *testing.T) (string, string) {
 	return tmpHome, repoPath
 }
 
-// initRepo runs codemob init in the given repo, providing "main" as base branch input.
+// initRepo runs codemob init in the given repo, providing defaults for base branch and agent.
 func initRepo(t *testing.T, bin, repoPath string) {
 	t.Helper()
 	cmd := exec.Command(bin, "init")
 	cmd.Dir = repoPath
-	cmd.Stdin = strings.NewReader("main\n")
+	cmd.Stdin = strings.NewReader("main\nclaude\n")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("init failed: %s\n%s", err, out)
