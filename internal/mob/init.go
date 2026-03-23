@@ -185,13 +185,23 @@ func setupGlobalGitignore() {
 	// Ensure parent dir exists
 	os.MkdirAll(filepath.Dir(gitignoreFile), 0755)
 
-	// Check if already set up
-	if fileContains(gitignoreFile, ".codemob/") && fileContains(gitignoreFile, "mob-*.md") {
+	patterns := map[string]string{
+		".codemob/":                      ".codemob/",
+		".claude/commands/mob-*.md":      ".claude/commands/mob-*.md",
+		".claude/commands/codemob-*.md":  ".claude/commands/codemob-*.md",
+	}
+
+	var missing []string
+	for check, line := range patterns {
+		if !fileContains(gitignoreFile, check) {
+			missing = append(missing, line)
+		}
+	}
+	if len(missing) == 0 {
 		info("Global gitignore already configured for codemob")
 		return
 	}
 
-	// Append
 	f, err := os.OpenFile(gitignoreFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		warn(fmt.Sprintf("Could not write to %s: %v", gitignoreFile, err))
@@ -199,7 +209,12 @@ func setupGlobalGitignore() {
 	}
 	defer f.Close()
 
-	f.WriteString("\n# codemob\n.codemob/\n.claude/commands/mob-*.md\n.claude/commands/codemob-*.md\n")
+	if !fileContains(gitignoreFile, "# codemob") {
+		f.WriteString("\n# codemob\n")
+	}
+	for _, line := range missing {
+		f.WriteString(line + "\n")
+	}
 	info(fmt.Sprintf("Added codemob entries to global gitignore (%s)", gitignoreFile))
 }
 
@@ -327,7 +342,11 @@ func setupClaudePermissions() {
 		warn(fmt.Sprintf("Could not create Claude settings directory: %v", err))
 		return
 	}
-	out, _ := json.MarshalIndent(settings, "", "  ")
+	out, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		warn(fmt.Sprintf("Could not serialize Claude settings: %v", err))
+		return
+	}
 	if err := os.WriteFile(settingsPath, append(out, '\n'), 0644); err != nil {
 		warn(fmt.Sprintf("Could not write Claude settings: %v", err))
 		return
@@ -374,7 +393,7 @@ func removeClaudePermissions() {
 		toRemove[perm] = true
 	}
 
-	var filtered []interface{}
+	filtered := make([]interface{}, 0)
 	removed := 0
 	for _, p := range allowList {
 		if s, ok := p.(string); ok && toRemove[s] {
@@ -392,7 +411,11 @@ func removeClaudePermissions() {
 	perms["allow"] = filtered
 	settings["permissions"] = perms
 
-	out, _ := json.MarshalIndent(settings, "", "  ")
+	out, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		warn(fmt.Sprintf("Could not serialize Claude settings: %v", err))
+		return
+	}
 	if err := os.WriteFile(settingsPath, append(out, '\n'), 0644); err != nil {
 		warn(fmt.Sprintf("Could not write Claude settings: %v", err))
 		return
@@ -494,8 +517,15 @@ func setupRepo() string {
 		BaseBranch:   defaultBranch,
 		Mobs:         []Mob{},
 	}
-	data, _ := json.MarshalIndent(cfg, "", "  ")
-	os.WriteFile(configFile, append(data, '\n'), 0644)
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		warn(fmt.Sprintf("Could not serialize config: %v", err))
+		return root
+	}
+	if err := os.WriteFile(configFile, append(data, '\n'), 0644); err != nil {
+		warn(fmt.Sprintf("Could not write config: %v", err))
+		return root
+	}
 
 	_ = codemobDir
 	info(fmt.Sprintf("Created %s (base_branch: %s)", configFile, defaultBranch))
@@ -640,7 +670,10 @@ func removeCodemobLines(path string) bool {
 	}
 
 	if removed {
-		os.WriteFile(path, []byte(strings.Join(kept, "\n")), 0644)
+		if err := os.WriteFile(path, []byte(strings.Join(kept, "\n")), 0644); err != nil {
+			warn(fmt.Sprintf("Could not write %s: %v", path, err))
+			return false
+		}
 	}
 	return removed
 }

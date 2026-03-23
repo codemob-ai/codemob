@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -67,8 +68,6 @@ func Execute() error {
 		return cmdNew(args)
 	case "list":
 		return cmdList(args, false)
-	case "resolve":
-		return cmdResolve(args)
 	case "queue":
 		return cmdWriteNext(args)
 
@@ -146,10 +145,11 @@ func cmdNew(args []string) error {
 		case "--no-launch":
 			noLaunch = true
 		case "--agent":
-			if i+1 < len(args) {
-				agent = args[i+1]
-				i++
+			if i+1 >= len(args) {
+				return fmt.Errorf("--agent requires a value (e.g., --agent codex)")
 			}
+			agent = args[i+1]
+			i++
 		default:
 			if name == "" {
 				name = args[i]
@@ -158,15 +158,14 @@ func cmdNew(args []string) error {
 	}
 
 	if name == "" {
-		name = mob.GenerateName()
-	}
-
-	if err := mob.ValidateName(name); err != nil {
-		return err
-	}
-
-	if m := mob.FindMob(cfg, name); m != nil {
-		return fmt.Errorf("mob '%s' already exists", name)
+		name = mob.GenerateUniqueName(cfg)
+	} else {
+		if err := mob.ValidateName(name); err != nil {
+			return err
+		}
+		if m := mob.FindMob(cfg, name); m != nil {
+			return fmt.Errorf("mob '%s' already exists", name)
+		}
 	}
 
 	branch := "mob/" + name
@@ -236,9 +235,11 @@ func cmdResume(args []string) error {
 	name := ""
 	noLaunch := false
 	for _, arg := range args {
-		switch arg {
-		case "--no-launch":
+		switch {
+		case arg == "--no-launch":
 			noLaunch = true
+		case strings.HasPrefix(arg, "--"):
+			return fmt.Errorf("unknown flag for --resume: %s", arg)
 		default:
 			if name == "" {
 				name = arg
@@ -264,30 +265,6 @@ func cmdResume(args []string) error {
 	return nil
 }
 
-// cmdResolve is the internal command used by the shell wrapper.
-// Outputs KEY=VALUE lines for the shell to parse.
-func cmdResolve(args []string) error {
-	root, cfg, err := requireInit()
-	if err != nil {
-		return err
-	}
-
-	if len(args) == 0 {
-		return fmt.Errorf("mob name required")
-	}
-	name := args[0]
-
-	m := resolveMob(cfg, name)
-	if m == nil {
-		return fmt.Errorf("mob '%s' not found", name)
-	}
-
-	worktreePath := filepath.Join(root, mob.MobsDir, m.Name)
-	fmt.Printf("CODEMOB_PATH=%s\n", worktreePath)
-	fmt.Printf("CODEMOB_AGENT=%s\n", m.Agent)
-	fmt.Printf("CODEMOB_NAME=%s\n", m.Name)
-	return nil
-}
 
 func cmdRemove(args []string) error {
 	root, cfg, err := requireInit()
@@ -434,13 +411,14 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 	case "new":
 		name := next.Target
 		if name == "" {
-			name = mob.GenerateName()
-		}
-		if err := mob.ValidateName(name); err != nil {
-			return "", "", false, err
-		}
-		if m := mob.FindMob(cfg, name); m != nil {
-			return "", "", false, fmt.Errorf("mob '%s' already exists", name)
+			name = mob.GenerateUniqueName(cfg)
+		} else {
+			if err := mob.ValidateName(name); err != nil {
+				return "", "", false, err
+			}
+			if m := mob.FindMob(cfg, name); m != nil {
+				return "", "", false, fmt.Errorf("mob '%s' already exists", name)
+			}
 		}
 		branch := "mob/" + name
 		worktreePath := filepath.Join(root, mob.MobsDir, name)
@@ -449,18 +427,23 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 			return "", "", false, err
 		}
 
+		agent := next.Agent
+		if agent == "" {
+			agent = cfg.DefaultAgent
+		}
+
 		cfg.Mobs = append(cfg.Mobs, mob.Mob{
 			Name:      name,
 			Branch:    branch,
 			CreatedAt: time.Now().UTC().Format(time.RFC3339),
-			Agent:     cfg.DefaultAgent,
+			Agent:     agent,
 		})
 		if err := mob.SaveConfig(root, cfg); err != nil {
 			return "", "", false, err
 		}
 
 		mobStatus(fmt.Sprintf("Created mob '%s' on branch %s", name, branch))
-		return worktreePath, cfg.DefaultAgent, false, nil
+		return worktreePath, agent, false, nil
 
 	case "remove":
 		name := next.Target
@@ -507,13 +490,6 @@ func executeNextAction(root string, next *mob.QueuedAction) error {
 
 // cmdWriteNext writes a next action for the trampoline.
 // Used by slash commands: codemob queue switch <mob-name>
-var validQueueActions = map[string]bool{
-	"switch":       true,
-	"new":          true,
-	"remove":       true,
-	"change-agent": true,
-}
-
 func cmdWriteNext(args []string) error {
 	if len(args) < 1 {
 		return fmt.Errorf("usage: codemob queue <action> [target]")
@@ -523,7 +499,7 @@ func cmdWriteNext(args []string) error {
 		return err
 	}
 	action := args[0]
-	if !validQueueActions[action] {
+	if !mob.ValidQueueActions[action] {
 		return fmt.Errorf("unknown queue action: %s", action)
 	}
 	target := ""
@@ -531,11 +507,29 @@ func cmdWriteNext(args []string) error {
 		target = args[1]
 	}
 
+	// Validate: switch, remove, and change-agent require a target
+	if target == "" && (action == "switch" || action == "remove" || action == "change-agent") {
+		return fmt.Errorf("codemob queue %s requires a target", action)
+	}
+
 	q := mob.QueuedAction{Action: action, Target: target}
 
 	// For change-agent, record which mob we're in right now
 	if action == "change-agent" {
 		q.Mob = mob.CurrentMobName()
+	}
+
+	// For new, carry the current mob's agent so the new mob uses the same one
+	if action == "new" {
+		currentName := mob.CurrentMobName()
+		if currentName != "" {
+			cfg, err := mob.LoadConfig(root)
+			if err == nil {
+				if m := mob.FindMob(cfg, currentName); m != nil {
+					q.Agent = m.Agent
+				}
+			}
+		}
 	}
 
 	return mob.WriteQueuedAction(root, q)
@@ -585,7 +579,12 @@ func runAgent(agent, workdir string, resume bool) error {
 		if err == nil {
 			return nil
 		}
-		// Resume failed (no prior session) — fall back to new session
+		// Only fall back to new session if the agent exited with a non-zero code
+		// (typical for "no session to continue"). Other errors (binary not found,
+		// permission denied) should propagate.
+		if _, ok := err.(*exec.ExitError); !ok {
+			return err
+		}
 		mobStatus("No previous session found, starting new session")
 	}
 

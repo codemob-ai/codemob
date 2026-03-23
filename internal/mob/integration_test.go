@@ -92,8 +92,8 @@ func runCoreExpectError(t *testing.T, bin, dir string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command(bin, args...)
 	cmd.Dir = dir
-	out, _ := cmd.CombinedOutput()
-	if cmd.ProcessState.ExitCode() == 0 {
+	out, err := cmd.CombinedOutput()
+	if err == nil {
 		t.Fatalf("expected codemob %v to fail, but it succeeded: %s", args, out)
 	}
 	return string(out)
