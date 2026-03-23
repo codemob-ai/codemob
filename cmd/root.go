@@ -615,11 +615,16 @@ func runAgent(root, agent, workdir string, resume bool) error {
 }
 
 func agentArgs(agent, repoRoot string) (binPath string, resumeArgs, newArgs []string, err error) {
+	worktreeHint := "You are working inside a codemob worktree. " +
+		"This IS a full git repository — all files and history are available here. " +
+		"Use your current working directory as the project root. " +
+		"Do not navigate to " + repoRoot + " — that is the main repo, not your workspace."
+
 	switch agent {
 	case "claude":
 		binPath, err = exec.LookPath("claude")
-		resumeArgs = []string{"--continue", "--add-dir", repoRoot}
-		newArgs = []string{"--add-dir", repoRoot}
+		resumeArgs = []string{"--continue", "--add-dir", repoRoot, "--append-system-prompt", worktreeHint}
+		newArgs = []string{"--add-dir", repoRoot, "--append-system-prompt", worktreeHint}
 	case "codex":
 		binPath, err = exec.LookPath("codex")
 		resumeArgs = []string{"resume", "--last", "--add-dir", repoRoot}
