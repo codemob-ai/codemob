@@ -12,11 +12,12 @@ build:
 	@go build $(LDFLAGS) -o codemob .
 	@echo "  → ./codemob"
 
-install: build
+install:
 	@echo "Dev install — emulating Homebrew layout at $(PREFIX)"
 	@echo ""
 	@mkdir -p $(BINDIR) $(SHAREDIR)
-	@cp codemob $(BINDIR)/codemob
+	@echo "Building codemob $(VERSION)..."
+	@go build $(LDFLAGS) -o $(BINDIR)/codemob .
 	@cp codemob-shell.sh $(SHAREDIR)/codemob-shell.sh
 	@echo "  → $(BINDIR)/codemob"
 	@echo "  → $(SHAREDIR)/codemob-shell.sh"

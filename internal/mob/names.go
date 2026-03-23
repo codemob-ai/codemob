@@ -1,6 +1,9 @@
 package mob
 
-import "math/rand"
+import (
+	"fmt"
+	"math/rand"
+)
 
 var adjectives = []string{
 	"angry", "brave", "calm", "daring", "eager",
@@ -33,4 +36,16 @@ func GenerateName() string {
 	adj := adjectives[rand.Intn(len(adjectives))]
 	fruit := fruits[rand.Intn(len(fruits))]
 	return adj + "-" + fruit
+}
+
+// GenerateUniqueName creates a random name that doesn't collide with existing mobs.
+func GenerateUniqueName(cfg *Config) string {
+	for i := 0; i < 50; i++ {
+		name := GenerateName()
+		if FindMob(cfg, name) == nil {
+			return name
+		}
+	}
+	// Extremely unlikely fallback — append random suffix
+	return GenerateName() + "-" + fmt.Sprintf("%d", rand.Intn(999))
 }

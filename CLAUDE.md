@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Brand colors
+
+- `#002900` — background (dark green)
+- `#e7dc60` — accent (yellow-gold)
+
 ## What is codemob
 
 codemob is a CLI tool that manages git worktrees as isolated AI agent workspaces called "mobs." It abstracts away manual worktree management so you can spin up, list, switch between, and clean up workspaces without touching git commands directly.

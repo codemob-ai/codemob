@@ -76,7 +76,7 @@ func SaveConfig(repoRoot string, cfg *Config) error {
 // Reconcile removes mobs from config whose worktree no longer exists on disk.
 func Reconcile(repoRoot string, cfg *Config) bool {
 	changed := false
-	var valid []Mob
+	valid := make([]Mob, 0)
 	for _, m := range cfg.Mobs {
 		mobPath := filepath.Join(repoRoot, MobsDir, m.Name)
 		if _, err := os.Stat(mobPath); err == nil {
@@ -100,8 +100,8 @@ func ValidateName(name string) error {
 	// Reject all-numeric names — ambiguous with index-based resolution
 	allDigits := true
 	for _, c := range name {
-		if !((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-') {
-			return fmt.Errorf("mob name can only contain lowercase letters, numbers, and hyphens")
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-') {
+			return fmt.Errorf("mob name can only contain letters, numbers, and hyphens")
 		}
 		if c < '0' || c > '9' {
 			allDigits = false

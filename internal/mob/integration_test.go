@@ -51,12 +51,12 @@ func setupTestRepo(t *testing.T) (string, string) {
 	return tmpHome, repoPath
 }
 
-// initRepo runs codemob init in the given repo, providing "main" as base branch input.
+// initRepo runs codemob init in the given repo, providing defaults for base branch and agent.
 func initRepo(t *testing.T, bin, repoPath string) {
 	t.Helper()
 	cmd := exec.Command(bin, "init")
 	cmd.Dir = repoPath
-	cmd.Stdin = strings.NewReader("main\n")
+	cmd.Stdin = strings.NewReader("main\nclaude\n")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("init failed: %s\n%s", err, out)
@@ -92,8 +92,8 @@ func runCoreExpectError(t *testing.T, bin, dir string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command(bin, args...)
 	cmd.Dir = dir
-	out, _ := cmd.CombinedOutput()
-	if cmd.ProcessState.ExitCode() == 0 {
+	out, err := cmd.CombinedOutput()
+	if err == nil {
 		t.Fatalf("expected codemob %v to fail, but it succeeded: %s", args, out)
 	}
 	return string(out)
@@ -399,6 +399,242 @@ func TestUninitializedRepo(t *testing.T) {
 		t.Errorf("expected 'not initialized' error, got: %s", out)
 	}
 }
+
+// ─── Name Validation ──────────────────────────────────────────────────────────
+
+func TestNameValidation_Uppercase(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	// when -> uppercase name
+	runCore(t, bin, repoPath, "--new", "MyFeature", "--no-launch")
+
+	// then -> should work
+	cfg := readConfig(t, repoPath)
+	mobs := cfg["mobs"].([]interface{})
+	if len(mobs) != 1 {
+		t.Fatalf("expected 1 mob, got %d", len(mobs))
+	}
+	if mobs[0].(map[string]interface{})["name"] != "MyFeature" {
+		t.Errorf("expected name=MyFeature, got %v", mobs[0].(map[string]interface{})["name"])
+	}
+}
+
+func TestNameValidation_AllNumericRejected(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	// when -> all-numeric name
+	out := runCoreExpectError(t, bin, repoPath, "--new", "123", "--no-launch")
+
+	// then
+	if !strings.Contains(out, "numeric") {
+		t.Errorf("expected numeric rejection error, got: %s", out)
+	}
+}
+
+func TestNameValidation_TooLong(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	// when -> 61 char name
+	longName := strings.Repeat("a", 61)
+	out := runCoreExpectError(t, bin, repoPath, "--new", longName, "--no-launch")
+
+	// then
+	if !strings.Contains(out, "too long") {
+		t.Errorf("expected too long error, got: %s", out)
+	}
+}
+
+func TestNameValidation_LeadingHyphen(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	// when
+	out := runCoreExpectError(t, bin, repoPath, "--new", "-bad", "--no-launch")
+
+	// then
+	if !strings.Contains(out, "hyphen") {
+		t.Errorf("expected hyphen error, got: %s", out)
+	}
+}
+
+func TestNameValidation_SpecialChars(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	// when
+	out := runCoreExpectError(t, bin, repoPath, "--new", "foo/bar", "--no-launch")
+
+	// then
+	if !strings.Contains(out, "letters") {
+		t.Errorf("expected invalid char error, got: %s", out)
+	}
+}
+
+// ─── Index-Based Resolution ──────────────────────────────────────────────────
+
+func TestResumeByIndex(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "--new", "alpha", "--no-launch")
+	runCore(t, bin, repoPath, "--new", "beta", "--no-launch")
+
+	// when -> resume by index
+	out := runCore(t, bin, repoPath, "--resume", "2", "--no-launch")
+
+	// then -> should mention beta
+	if !strings.Contains(out, "beta") {
+		t.Errorf("expected 'beta' in resume output, got: %s", out)
+	}
+}
+
+func TestRemoveByIndex(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "--new", "first", "--no-launch")
+	runCore(t, bin, repoPath, "--new", "second", "--no-launch")
+
+	// when -> remove by index
+	runCore(t, bin, repoPath, "remove", "1")
+
+	// then -> only second remains
+	cfg := readConfig(t, repoPath)
+	mobs := cfg["mobs"].([]interface{})
+	if len(mobs) != 1 {
+		t.Fatalf("expected 1 mob after remove, got %d", len(mobs))
+	}
+	if mobs[0].(map[string]interface{})["name"] != "second" {
+		t.Errorf("expected 'second' to remain, got %v", mobs[0].(map[string]interface{})["name"])
+	}
+}
+
+// ─── List Others ─────────────────────────────────────────────────────────────
+
+func TestListOthersExcludesCurrent(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "--new", "mob-a", "--no-launch")
+	runCore(t, bin, repoPath, "--new", "mob-b", "--no-launch")
+
+	// when -> list-others from inside mob-a
+	worktreeA := filepath.Join(repoPath, ".codemob", "mobs", "mob-a")
+	out := runCore(t, bin, worktreeA, "--list-others")
+
+	// then -> should show mob-b but not mob-a
+	if strings.Contains(out, "mob-a") {
+		t.Errorf("--list-others should exclude current mob, got: %s", out)
+	}
+	if !strings.Contains(out, "mob-b") {
+		t.Errorf("--list-others should show mob-b, got: %s", out)
+	}
+}
+
+// ─── Clear ───────────────────────────────────────────────────────────────────
+
+func TestClear(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "--new", "one", "--no-launch")
+	runCore(t, bin, repoPath, "--new", "two", "--no-launch")
+
+	// when -> clear with "y" confirmation
+	cmd := exec.Command(bin, "clear")
+	cmd.Dir = repoPath
+	cmd.Stdin = strings.NewReader("y\n")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("clear failed: %s\n%s", err, out)
+	}
+
+	// then -> no mobs
+	cfg := readConfig(t, repoPath)
+	mobs, _ := cfg["mobs"].([]interface{})
+	if len(mobs) != 0 {
+		t.Errorf("expected 0 mobs after clear, got %d", len(mobs))
+	}
+
+	// then -> worktrees should be gone
+	if _, err := os.Stat(filepath.Join(repoPath, ".codemob", "mobs", "one")); err == nil {
+		t.Error("worktree 'one' still exists after clear")
+	}
+	if _, err := os.Stat(filepath.Join(repoPath, ".codemob", "mobs", "two")); err == nil {
+		t.Error("worktree 'two' still exists after clear")
+	}
+}
+
+// ─── Queue Validation ────────────────────────────────────────────────────────
+
+func TestQueueUnknownAction(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	// when
+	out := runCoreExpectError(t, bin, repoPath, "queue", "bogus", "target")
+
+	// then
+	if !strings.Contains(out, "unknown queue action") {
+		t.Errorf("expected unknown action error, got: %s", out)
+	}
+}
+
+func TestQueueSwitchRequiresTarget(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	// when -> switch with no target
+	out := runCoreExpectError(t, bin, repoPath, "queue", "switch")
+
+	// then
+	if !strings.Contains(out, "requires a target") {
+		t.Errorf("expected target required error, got: %s", out)
+	}
+}
+
+// ─── Agent Flag ──────────────────────────────────────────────────────────────
+
+func TestAgentMissingValue(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	// when -> --agent with no value
+	out := runCoreExpectError(t, bin, repoPath, "--new", "--agent")
+
+	// then
+	if !strings.Contains(out, "--agent requires") {
+		t.Errorf("expected --agent requires value error, got: %s", out)
+	}
+}
+
+func TestResumeRejectsUnknownFlags(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "--new", "test-mob", "--no-launch")
+
+	// when -> --agent passed to --resume
+	out := runCoreExpectError(t, bin, repoPath, "--resume", "--agent", "codex")
+
+	// then
+	if !strings.Contains(out, "unknown flag") {
+		t.Errorf("expected unknown flag error, got: %s", out)
+	}
+}
+
+// ─── Original Tests ──────────────────────────────────────────────────────────
 
 func TestNewMobWithCustomAgent(t *testing.T) {
 	bin := buildCore(t)
