@@ -110,3 +110,19 @@ Makefile                # build/install/test
 ## Core/shell interface
 
 The Go binary is the primary interface — it handles everything including agent launching (as child processes with a trampoline loop). The shell script is an optional enhancement that provides `mob` alias and `claude --new-mob` / `codex --new-mob` wrappers, plus post-exit queue checking.
+
+## Session tracking (CODEMOB_SESSION)
+
+`codemob-shell.sh` sets `$CODEMOB_SESSION` (a UUID) once per terminal window at shell startup. The Go binary uses this as a file key under `.codemob/sessions/<uuid>` to track the last active mob per terminal.
+
+This enables `codemob --resume` (no name) to default to the last-used mob in that terminal — even with parallel sessions in different terminals.
+
+**How it works:**
+- `writeLastMob()` in `launchAgent` writes the mob name on normal exit
+- `readLastMob()` in `cmdResume` reads it to pre-select the default
+- On remove/drop (empty workdir), nothing is written — stale entry is harmless since the mob won't exist in config anymore
+
+**Edge cases to keep in mind when modifying queue/trampoline logic:**
+- Any new queue action that removes a mob must NOT call `writeLastMob` (same as "remove" today)
+- Any new queue action that switches to a different mob must update `workdir` before the loop continues (same as "switch"/"new" today)
+- The session file is never deleted — orphaned files from closed terminals are harmless (mob existence is validated on read)

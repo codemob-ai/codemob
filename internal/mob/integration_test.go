@@ -169,8 +169,8 @@ func TestInit(t *testing.T) {
 	// then -> slash commands should be installed in the project's .claude/commands/
 	commandsDir := filepath.Join(repoPath, ".claude", "commands")
 	for _, name := range []string{
-		"mob-list.md", "mob-new.md", "mob-switch.md", "mob-remove.md",
-		"codemob-list.md", "codemob-new.md", "codemob-switch.md", "codemob-remove.md",
+		"mob-list.md", "mob-new.md", "mob-switch.md", "mob-remove.md", "mob-drop.md",
+		"codemob-list.md", "codemob-new.md", "codemob-switch.md", "codemob-remove.md", "codemob-drop.md",
 	} {
 		if _, err := os.Stat(filepath.Join(commandsDir, name)); err != nil {
 			t.Errorf("slash command %s not installed: %v", name, err)
@@ -196,6 +196,7 @@ func TestSlashCommandsReferenceValidCommands(t *testing.T) {
 		"mob-new.md":    {"codemob queue new"},
 		"mob-switch.md": {"codemob --list-others", "codemob queue switch"},
 		"mob-remove.md": {"codemob --list", "codemob remove", "codemob queue remove"},
+		"mob-drop.md":   {"codemob queue remove"},
 	}
 
 	for file, commands := range expected {
@@ -693,6 +694,148 @@ func TestResumeRejectsUnknownFlags(t *testing.T) {
 	// then
 	if !strings.Contains(out, "unknown flag") {
 		t.Errorf("expected unknown flag error, got: %s", out)
+	}
+}
+
+// ─── Session Tracking ─────────────────────────────────────────────────────────
+
+// writeSessionFile creates a session file mapping a session ID to a mob name.
+func writeSessionFile(t *testing.T, repoPath, sessionID, mobName string) {
+	t.Helper()
+	sessDir := filepath.Join(repoPath, ".codemob", "sessions")
+	os.MkdirAll(sessDir, 0755)
+	if err := os.WriteFile(filepath.Join(sessDir, sessionID), []byte(mobName), 0644); err != nil {
+		t.Fatalf("failed to write session file: %v", err)
+	}
+}
+
+// runCoreWithSession runs codemob with a CODEMOB_SESSION env var and optional stdin.
+func runCoreWithSession(t *testing.T, bin, dir, sessionID, stdin string, args ...string) (string, error) {
+	t.Helper()
+	cmd := exec.Command(bin, args...)
+	cmd.Dir = dir
+	cmd.Stdin = strings.NewReader(stdin)
+	cmd.Env = append(os.Environ(), "CODEMOB_SESSION="+sessionID)
+	out, err := cmd.CombinedOutput()
+	return string(out), err
+}
+
+func TestResumeDefaultsToSessionLastMob(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "--new", "alpha", "--no-launch")
+	runCore(t, bin, repoPath, "--new", "beta", "--no-launch")
+
+	// given -> session file points to beta
+	writeSessionFile(t, repoPath, "sess-1", "beta")
+
+	// when -> resume with empty input (should use session default)
+	out, err := runCoreWithSession(t, bin, repoPath, "sess-1", "\n", "--resume", "--no-launch")
+
+	// then -> should resume beta
+	if err != nil {
+		t.Fatalf("resume failed: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "Resuming mob 'beta'") {
+		t.Errorf("expected to resume 'beta' via session default, got: %s", out)
+	}
+}
+
+func TestResumeShowsLastMobMarker(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "--new", "alpha", "--no-launch")
+	runCore(t, bin, repoPath, "--new", "beta", "--no-launch")
+
+	// given -> session file points to alpha
+	writeSessionFile(t, repoPath, "sess-2", "alpha")
+
+	// when -> resume by explicit name (we still see the picker output)
+	out, err := runCoreWithSession(t, bin, repoPath, "sess-2", "beta\n", "--resume", "--no-launch")
+
+	// then -> output should show ◀ marker next to alpha
+	if err != nil {
+		t.Fatalf("resume failed: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "alpha ◀") {
+		t.Errorf("expected ◀ marker next to 'alpha', got: %s", out)
+	}
+	if !strings.Contains(out, "[alpha]") {
+		t.Errorf("expected [alpha] default in prompt, got: %s", out)
+	}
+}
+
+func TestResumeIgnoresRemovedMobInSession(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "--new", "temp", "--no-launch")
+	runCore(t, bin, repoPath, "--new", "keeper", "--no-launch")
+
+	// given -> session points to temp, but we remove it
+	writeSessionFile(t, repoPath, "sess-3", "temp")
+	runCore(t, bin, repoPath, "remove", "temp")
+
+	// when -> resume with empty input (session mob is gone, only one mob left)
+	out, err := runCoreWithSession(t, bin, repoPath, "sess-3", "", "--resume", "--no-launch")
+
+	// then -> should auto-select the only remaining mob (keeper)
+	if err != nil {
+		t.Fatalf("resume failed: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "Resuming mob 'keeper'") {
+		t.Errorf("expected to resume 'keeper' (only remaining mob), got: %s", out)
+	}
+}
+
+func TestSessionIsolation(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "--new", "mob-a", "--no-launch")
+	runCore(t, bin, repoPath, "--new", "mob-b", "--no-launch")
+
+	// given -> two different sessions point to different mobs
+	writeSessionFile(t, repoPath, "terminal-1", "mob-a")
+	writeSessionFile(t, repoPath, "terminal-2", "mob-b")
+
+	// when -> resume from terminal-1
+	out1, err := runCoreWithSession(t, bin, repoPath, "terminal-1", "\n", "--resume", "--no-launch")
+	if err != nil {
+		t.Fatalf("resume (terminal-1) failed: %v\n%s", err, out1)
+	}
+
+	// then -> should default to mob-a
+	if !strings.Contains(out1, "Resuming mob 'mob-a'") {
+		t.Errorf("terminal-1 should resume mob-a, got: %s", out1)
+	}
+
+	// when -> resume from terminal-2
+	out2, err := runCoreWithSession(t, bin, repoPath, "terminal-2", "\n", "--resume", "--no-launch")
+	if err != nil {
+		t.Fatalf("resume (terminal-2) failed: %v\n%s", err, out2)
+	}
+
+	// then -> should default to mob-b
+	if !strings.Contains(out2, "Resuming mob 'mob-b'") {
+		t.Errorf("terminal-2 should resume mob-b, got: %s", out2)
+	}
+}
+
+func TestResumeWithoutSessionWorks(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "--new", "no-session", "--no-launch")
+
+	// when -> resume with explicit name, no CODEMOB_SESSION set
+	out := runCore(t, bin, repoPath, "--resume", "no-session", "--no-launch")
+
+	// then -> should work fine
+	if !strings.Contains(out, "Resuming mob 'no-session'") {
+		t.Errorf("expected to resume 'no-session', got: %s", out)
 	}
 }
 
