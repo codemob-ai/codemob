@@ -55,8 +55,10 @@ func Execute() error {
 		return cmdCheckNext(args)
 
 	// Subcommands (management)
-	case "init", "reinit":
-		return cmdInit(args)
+	case "init":
+		return cmdInit(args, false)
+	case "reinit":
+		return cmdInit(args, true)
 	case "uninstall":
 		return cmdUninstall(args)
 	case "remove":
@@ -104,13 +106,13 @@ func resolveMob(cfg *mob.Config, nameOrIndex string) *mob.Mob {
 	return mob.FindMob(cfg, nameOrIndex)
 }
 
-func cmdInit(_ []string) error {
+func cmdInit(_ []string, forceReprompt bool) error {
 	exe, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("could not determine install directory: %w", err)
 	}
 	installDir := filepath.Dir(exe)
-	return mob.Init(installDir)
+	return mob.Init(installDir, forceReprompt)
 }
 
 func requireInit() (string, *mob.Config, error) {

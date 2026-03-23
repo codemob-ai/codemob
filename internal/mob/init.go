@@ -128,7 +128,7 @@ func errMsg(msg string) { fmt.Fprintf(os.Stderr, "%s✗%s %s\n", red, reset, msg
 
 // Init performs the full codemob initialization.
 // installDir is the directory where codemob-shell.sh lives.
-func Init(installDir string) error {
+func Init(installDir string, forceReprompt bool) error {
 	printBanner()
 	fmt.Println("codemob init")
 	fmt.Println("────────────")
@@ -144,7 +144,7 @@ func Init(installDir string) error {
 
 	fmt.Println()
 	fmt.Println("Repo setup:")
-	repoRoot := setupRepo()
+	repoRoot := setupRepo(forceReprompt)
 	setupClaudeCommands(repoRoot)
 	setupCodexPrompts()
 
@@ -483,7 +483,7 @@ func setupCodexPrompts() {
 	}
 }
 
-func setupRepo() string {
+func setupRepo(reprompt bool) string {
 	root, err := gitutil.RepoRoot()
 	if err != nil {
 		warn("Not inside a git repository. Skipping repo setup.")
@@ -491,57 +491,49 @@ func setupRepo() string {
 		return ""
 	}
 
-	codemobDir := filepath.Join(root, CodemobDir)
-	configFile := filepath.Join(root, ConfigFile)
-
-	// Create directories
 	os.MkdirAll(filepath.Join(root, MobsDir), 0755)
 
-	if _, err := os.Stat(configFile); err == nil {
+	// Load existing config or start with defaults
+	cfg, _ := LoadConfig(root)
+	isNew := cfg == nil
+	if isNew {
+		cfg = &Config{
+			DefaultAgent: "claude",
+			BaseBranch:   gitutil.DetectDefaultBranch(root),
+			Mobs:         []Mob{},
+		}
+	}
+
+	if !isNew && !reprompt {
 		info(fmt.Sprintf("Repo already initialized at %s", root))
 		return root
 	}
 
-	// Detect base branch
-	defaultBranch := gitutil.DetectDefaultBranch(root)
-
-	// Prompt for base branch
-	fmt.Println()
+	// Prompt
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Printf("Base branch for new mobs [%s]: ", defaultBranch)
+	fmt.Println()
+	fmt.Printf("Base branch for new mobs [%s]: ", cfg.BaseBranch)
 	input, _ := reader.ReadString('\n')
-	input = strings.TrimSpace(input)
-	if input != "" {
-		defaultBranch = input
+	if v := strings.TrimSpace(input); v != "" {
+		cfg.BaseBranch = v
 	}
 
-	// Prompt for default agent
-	defaultAgent := "claude"
-	fmt.Printf("Default agent (claude/codex) [%s]: ", defaultAgent)
-	agentInput, _ := reader.ReadString('\n')
-	agentInput = strings.TrimSpace(agentInput)
-	if agentInput != "" {
-		defaultAgent = agentInput
+	fmt.Printf("Default agent (claude/codex) [%s]: ", cfg.DefaultAgent)
+	input, _ = reader.ReadString('\n')
+	if v := strings.TrimSpace(input); v != "" {
+		cfg.DefaultAgent = v
 	}
 
-	// Create config
-	cfg := Config{
-		DefaultAgent: defaultAgent,
-		BaseBranch:   defaultBranch,
-		Mobs:         []Mob{},
-	}
-	data, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		warn(fmt.Sprintf("Could not serialize config: %v", err))
-		return root
-	}
-	if err := os.WriteFile(configFile, append(data, '\n'), 0644); err != nil {
+	if err := SaveConfig(root, cfg); err != nil {
 		warn(fmt.Sprintf("Could not write config: %v", err))
 		return root
 	}
 
-	_ = codemobDir
-	info(fmt.Sprintf("Created %s (base_branch: %s)", configFile, defaultBranch))
+	if isNew {
+		info(fmt.Sprintf("Created config (base_branch: %s, default_agent: %s)", cfg.BaseBranch, cfg.DefaultAgent))
+	} else {
+		info(fmt.Sprintf("Updated config (base_branch: %s, default_agent: %s)", cfg.BaseBranch, cfg.DefaultAgent))
+	}
 	return root
 }
 
