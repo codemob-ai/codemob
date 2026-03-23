@@ -169,8 +169,8 @@ func TestInit(t *testing.T) {
 	// then -> slash commands should be installed in the project's .claude/commands/
 	commandsDir := filepath.Join(repoPath, ".claude", "commands")
 	for _, name := range []string{
-		"mob-list.md", "mob-new.md", "mob-switch.md", "mob-remove.md",
-		"codemob-list.md", "codemob-new.md", "codemob-switch.md", "codemob-remove.md",
+		"mob-list.md", "mob-new.md", "mob-switch.md", "mob-remove.md", "mob-drop.md",
+		"codemob-list.md", "codemob-new.md", "codemob-switch.md", "codemob-remove.md", "codemob-drop.md",
 	} {
 		if _, err := os.Stat(filepath.Join(commandsDir, name)); err != nil {
 			t.Errorf("slash command %s not installed: %v", name, err)
@@ -196,6 +196,7 @@ func TestSlashCommandsReferenceValidCommands(t *testing.T) {
 		"mob-new.md":    {"codemob queue new"},
 		"mob-switch.md": {"codemob --list-others", "codemob queue switch"},
 		"mob-remove.md": {"codemob --list", "codemob remove", "codemob queue remove"},
+		"mob-drop.md":   {"codemob queue remove"},
 	}
 
 	for file, commands := range expected {

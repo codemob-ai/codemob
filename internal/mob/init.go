@@ -71,6 +71,17 @@ If they choose a DIFFERENT mob (not the current one), run ` + "`codemob remove <
 If they choose the CURRENT mob, run ` + "`codemob queue remove <name>`" + ` and tell them: "Removal queued. Exit this session (Ctrl+C) and codemob will remove the mob."
 `,
 	},
+	"drop": {
+		Description: "Remove the current codemob workspace and exit",
+		Body: `Determine the current mob by checking if the working directory contains ` + "`.codemob/mobs/`" + ` — if so, extract the mob name from the path.
+
+If you are NOT inside a codemob worktree, tell the user: "This command can only be used from within a codemob workspace." and stop.
+
+Otherwise, run ` + "`codemob queue remove <name>`" + ` using the Bash tool (replace ` + "`<name>`" + ` with the current mob name).
+
+Then tell the user: "Mob '<name>' queued for removal. Exit this session (Ctrl+C) and codemob will remove it."
+`,
+	},
 }
 
 // SlashCommands returns Claude Code slash commands (description as first line, then body).
