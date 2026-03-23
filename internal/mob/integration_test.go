@@ -61,7 +61,7 @@ esac
 	repoPath := filepath.Join(tmpHome, "test-repo")
 	os.MkdirAll(repoPath, 0755)
 
-	run(t, repoPath, "git", "init")
+	run(t, repoPath, "git", "init", "-b", "main")
 	run(t, repoPath, "git", "config", "user.email", "test@codemob.ai")
 	run(t, repoPath, "git", "config", "user.name", "codemob-test")
 	run(t, repoPath, "git", "commit", "--allow-empty", "-m", "init")
