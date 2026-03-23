@@ -1,0 +1,76 @@
+version: 2
+
+project_name: codemob
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: codemob
+    main: .
+    binary: codemob
+    ldflags:
+      - -s -w -X github.com/codemob-ai/codemob/cmd.Version={{.Version}}
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    env:
+      - CGO_ENABLED=0
+
+archives:
+  - id: default
+    format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - codemob-shell.sh
+      - LICENSE
+      - README.md
+      - CHANGELOG.md
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+
+release:
+  github:
+    owner: codemob-ai
+    name: codemob
+  prerelease: auto
+  name_template: "v{{.Version}}"
+
+brews:
+  - name: codemob
+    repository:
+      owner: codemob-ai
+      name: homebrew-codemob
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: codemob-bot
+      email: bot@codemob.ai
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+    directory: Formula
+    homepage: "https://github.com/codemob-ai/codemob"
+    description: "AI agent workspace manager — parallel isolated sessions via git worktrees"
+    license: "GPL-3.0-only"
+    install: |
+      bin.install "codemob"
+      (share/"codemob").install "codemob-shell.sh"
+    caveats: |
+      To complete setup, run:
+        codemob init
+
+      This configures shell integration (mob alias, claude/codex wrappers).
+    test: |
+      assert_match version.to_s, shell_output("#{bin}/codemob --version")
