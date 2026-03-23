@@ -155,8 +155,9 @@ func requireInit() (string, *mob.Config, error) {
 	if err != nil {
 		return "", nil, err
 	}
-	if mob.Reconcile(root, cfg) {
+	if removed := mob.Reconcile(root, cfg); len(removed) > 0 {
 		_ = mob.SaveConfig(root, cfg)
+		cleanSessionFiles(root, removed...)
 	}
 	return root, cfg, nil
 }
@@ -384,8 +385,34 @@ func cmdRemove(args []string) error {
 		return err
 	}
 
+	cleanSessionFiles(root, m.Name)
 	mobStatus(fmt.Sprintf("Removed mob '%s'", m.Name))
 	return nil
+}
+
+// cleanSessionFiles removes session files that point to any of the given mob names.
+func cleanSessionFiles(root string, names ...string) {
+	sessDir := filepath.Join(root, mob.CodemobDir, "sessions")
+	entries, err := os.ReadDir(sessDir)
+	if err != nil {
+		return
+	}
+	remove := make(map[string]bool, len(names))
+	for _, n := range names {
+		remove[n] = true
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(sessDir, e.Name()))
+		if err != nil {
+			continue
+		}
+		if remove[strings.TrimSpace(string(data))] {
+			os.Remove(filepath.Join(sessDir, e.Name()))
+		}
+	}
 }
 
 func cmdPurge(_ []string) error {
@@ -433,6 +460,8 @@ func cmdPurge(_ []string) error {
 	if err := mob.SaveConfig(root, cfg); err != nil {
 		return err
 	}
+
+	os.RemoveAll(filepath.Join(root, mob.CodemobDir, "sessions"))
 
 	fmt.Println()
 	fmt.Printf("  %s● codemob%s  All mobs purged\n", r, rst)

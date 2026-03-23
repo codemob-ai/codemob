@@ -74,19 +74,20 @@ func SaveConfig(repoRoot string, cfg *Config) error {
 }
 
 // Reconcile removes mobs from config whose worktree no longer exists on disk.
-func Reconcile(repoRoot string, cfg *Config) bool {
-	changed := false
+// Returns the names of removed mobs (empty if nothing changed).
+func Reconcile(repoRoot string, cfg *Config) []string {
+	var removed []string
 	valid := make([]Mob, 0)
 	for _, m := range cfg.Mobs {
 		mobPath := filepath.Join(repoRoot, MobsDir, m.Name)
 		if _, err := os.Stat(mobPath); err == nil {
 			valid = append(valid, m)
 		} else {
-			changed = true
+			removed = append(removed, m.Name)
 		}
 	}
 	cfg.Mobs = valid
-	return changed
+	return removed
 }
 
 // ValidateName checks if a mob name is safe for use in paths and branches.

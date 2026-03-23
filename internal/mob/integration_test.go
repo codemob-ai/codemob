@@ -636,6 +636,94 @@ func TestPurge(t *testing.T) {
 	}
 }
 
+// ─── Session Cleanup ─────────────────────────────────────────────────────────
+
+func TestRemoveCleansSessionFiles(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "target", "--no-launch")
+	runCore(t, bin, repoPath, "new", "other", "--no-launch")
+
+	// given -> two sessions pointing to target, one to other
+	writeSessionFile(t, repoPath, "sess-a", "target")
+	writeSessionFile(t, repoPath, "sess-b", "target")
+	writeSessionFile(t, repoPath, "sess-c", "other")
+
+	// when -> remove target
+	runCore(t, bin, repoPath, "remove", "target")
+
+	// then -> session files for target should be gone
+	sessDir := filepath.Join(repoPath, ".codemob", "sessions")
+	if _, err := os.Stat(filepath.Join(sessDir, "sess-a")); err == nil {
+		t.Error("session file sess-a still exists after removing target")
+	}
+	if _, err := os.Stat(filepath.Join(sessDir, "sess-b")); err == nil {
+		t.Error("session file sess-b still exists after removing target")
+	}
+
+	// then -> session file for other should remain
+	if _, err := os.Stat(filepath.Join(sessDir, "sess-c")); err != nil {
+		t.Error("session file sess-c was incorrectly removed")
+	}
+}
+
+func TestPurgeCleansSessionFiles(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "one", "--no-launch")
+	runCore(t, bin, repoPath, "new", "two", "--no-launch")
+
+	// given -> session files exist
+	writeSessionFile(t, repoPath, "sess-x", "one")
+	writeSessionFile(t, repoPath, "sess-y", "two")
+
+	// when -> purge
+	cmd := exec.Command(bin, "purge")
+	cmd.Dir = repoPath
+	cmd.Stdin = strings.NewReader("y\n")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("purge failed: %s\n%s", err, out)
+	}
+
+	// then -> sessions directory should be gone
+	sessDir := filepath.Join(repoPath, ".codemob", "sessions")
+	if _, err := os.Stat(sessDir); err == nil {
+		t.Error("sessions directory still exists after purge")
+	}
+}
+
+func TestReconcileCleansSessionFiles(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "orphan", "--no-launch")
+	runCore(t, bin, repoPath, "new", "alive", "--no-launch")
+
+	// given -> session files for both mobs
+	writeSessionFile(t, repoPath, "sess-orphan", "orphan")
+	writeSessionFile(t, repoPath, "sess-alive", "alive")
+
+	// given -> manually remove orphan's worktree (simulates external deletion)
+	run(t, repoPath, "git", "worktree", "remove", filepath.Join(".codemob", "mobs", "orphan"))
+
+	// when -> list triggers reconciliation
+	runCore(t, bin, repoPath, "list")
+
+	// then -> session file for orphan should be cleaned up
+	sessDir := filepath.Join(repoPath, ".codemob", "sessions")
+	if _, err := os.Stat(filepath.Join(sessDir, "sess-orphan")); err == nil {
+		t.Error("session file for orphan still exists after reconciliation")
+	}
+
+	// then -> session file for alive should remain
+	if _, err := os.Stat(filepath.Join(sessDir, "sess-alive")); err != nil {
+		t.Error("session file for alive was incorrectly removed")
+	}
+}
+
 // ─── Queue Validation ────────────────────────────────────────────────────────
 
 func TestQueueUnknownAction(t *testing.T) {
