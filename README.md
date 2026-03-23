@@ -134,7 +134,15 @@ Swap the agent on the fly - go from Claude to Codex (or back) on the same worksp
 
 ## Install
 
-Homebrew tap is WIP. For now, build from source:
+### Homebrew (recommended)
+
+```bash
+brew tap codemob-ai/codemob
+brew install codemob
+codemob init
+```
+
+### From source
 
 ```bash
 git clone https://github.com/codemob-ai/codemob.git
