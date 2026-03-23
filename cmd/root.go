@@ -89,6 +89,8 @@ func Execute() error {
 		return cmdPurge(args)
 	case "path":
 		return cmdPath(args)
+	case "info":
+		return cmdInfo()
 
 	// Internal (used by shell wrapper and slash commands)
 	case "switch":
@@ -832,6 +834,7 @@ func printUsage() {
 	fmt.Println("  remove <name>      Remove a mob")
 	fmt.Println("  purge              Remove all mobs")
 	fmt.Println("  path [name]        Print worktree path (interactive if no name)")
+	fmt.Println("  info               Show diagnostic information")
 	fmt.Println("  uninstall          Remove all codemob setup")
 	fmt.Println("")
 	fmt.Println("Options:")
