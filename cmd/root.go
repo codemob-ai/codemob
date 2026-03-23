@@ -257,14 +257,18 @@ func cmdResume(args []string) error {
 		if len(cfg.Mobs) == 0 {
 			return fmt.Errorf("no mobs. Create one with: codemob --new")
 		}
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "#\tNAME\tBRANCH\tLAST AGENT\tCREATED")
-		for i, m := range cfg.Mobs {
-			fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", i+1, m.Name, m.Branch, m.Agent, mob.RelativeTime(m.CreatedAt))
+		if len(cfg.Mobs) == 1 {
+			name = cfg.Mobs[0].Name
+		} else {
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+			fmt.Fprintln(w, "#\tNAME\tBRANCH\tLAST AGENT\tCREATED")
+			for i, m := range cfg.Mobs {
+				fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", i+1, m.Name, m.Branch, m.Agent, mob.RelativeTime(m.CreatedAt))
+			}
+			w.Flush()
+			fmt.Print("\nWhich mob? (#/name): ")
+			fmt.Scanln(&name)
 		}
-		w.Flush()
-		fmt.Print("\nWhich mob? (#/name): ")
-		fmt.Scanln(&name)
 		if name == "" {
 			return fmt.Errorf("no mob selected")
 		}
