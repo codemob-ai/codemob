@@ -1,12 +1,14 @@
 ![codemob](img/banner.png)
 
-Terminal-agnostic AI agent workspace manager with parallel isolated sessions.
-Powered by git worktrees under the hood, but you don't need to know that.
+**Terminal-agnostic AI agent workflow manager with parallel isolated sessions.**
+
+_Powered by git worktrees under the hood, but you don't need to know that._
+
+---
 
 Start a new session — codemob creates an isolated workspace and drops you into your agent:
 
 ```bash
-~/my-project
 ❯ claude --new-mob
 
   ● codemob  Created mob 'wild-kumquat' on branch mob/wild-kumquat
@@ -27,11 +29,13 @@ Need another session? Create one without leaving Claude:
 
 ❯ /codemob-new
 
-⏺ Name or auto-generate? → auto
+⏺ Name or auto-generate?
+
+❯ auto
 
 ⏺ New mob queued. Exit (Ctrl+C) and codemob will create and launch it.
 
-❯ Ctrl+C
+^C
 
   ● codemob  Created mob 'epic-apricot' on branch mob/epic-apricot
 
@@ -51,12 +55,13 @@ Switch between sessions — `/mob-switch`, pick one, exit, done:
 
 ⏺ #  NAME             LAST AGENT  CREATED
   1  wild-kumquat     claude      2h ago
+  2  angry-eggplant   claude      12h ago
 
   Which mob? → 1
 
 ⏺ Switch queued. Exit (Ctrl+C) and codemob launches the next session.
 
-❯ Ctrl+C
+^C
 
   ● codemob  Switching to mob 'wild-kumquat'
 
@@ -75,11 +80,13 @@ Swap the agent on the fly — go from Claude to Codex (or back) on the same work
 ❯ /mob-change-agent
 
 ⏺ codemob supports claude and codex. You're currently on claude.
-  Switch to codex? → yes
+  Switch to codex?
+
+❯ yes
 
 ⏺ Agent switch queued. Exit (Ctrl+C).
 
-❯ Ctrl+C
+^C
 
   ● codemob  Switching mob 'wild-kumquat' to agent 'codex'
 
