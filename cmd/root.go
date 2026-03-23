@@ -289,14 +289,27 @@ func cmdResume(args []string) error {
 		if len(cfg.Mobs) == 1 {
 			name = cfg.Mobs[0].Name
 		} else {
+			lastMob := readLastMob(root)
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 			fmt.Fprintln(w, "#\tNAME\tBRANCH\tLAST AGENT\tCREATED")
 			for i, m := range cfg.Mobs {
-				fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", i+1, m.Name, m.Branch, m.Agent, mob.RelativeTime(m.CreatedAt))
+				marker := ""
+				if m.Name == lastMob {
+					marker = " ◀"
+				}
+				fmt.Fprintf(w, "%d\t%s%s\t%s\t%s\t%s\n", i+1, m.Name, marker, m.Branch, m.Agent, mob.RelativeTime(m.CreatedAt))
 			}
 			w.Flush()
-			fmt.Print("\nWhich mob? (#/name): ")
+			if lastMob != "" && mob.FindMob(cfg, lastMob) != nil {
+				fmt.Printf("\nWhich mob? (#/name) [%s]: ", lastMob)
+			} else {
+				fmt.Print("\nWhich mob? (#/name): ")
+				lastMob = ""
+			}
 			fmt.Scanln(&name)
+			if name == "" {
+				name = lastMob
+			}
 		}
 		if name == "" {
 			return fmt.Errorf("no mob selected")
@@ -598,6 +611,8 @@ func cmdWriteNext(args []string) error {
 
 // launchAgent spawns the agent as a child process and implements the trampoline loop.
 // After the agent exits, it checks for a next action (e.g., switch to another mob).
+// On final exit, writes the last active mob name to .codemob/sessions/<session-id>
+// (keyed by $CODEMOB_SESSION) so resume can default to it.
 func launchAgent(root, agent, workdir string, resume bool) error {
 	for {
 		if err := runAgent(root, agent, workdir, resume); err != nil {
@@ -610,6 +625,7 @@ func launchAgent(root, agent, workdir string, resume bool) error {
 		// Always check for queued action, regardless of how the agent exited
 		next, err := mob.ReadQueuedAction(root)
 		if err != nil || next == nil {
+			writeLastMob(workdir)
 			return nil // normal exit
 		}
 		mob.ClearQueue(root)
@@ -619,12 +635,42 @@ func launchAgent(root, agent, workdir string, resume bool) error {
 			return err
 		}
 		if newWorkdir == "" {
-			return nil // action completed, no agent to launch (e.g., remove)
+			return nil // action completed (e.g., remove) — don't write last mob
 		}
 		workdir = newWorkdir
 		agent = newAgent
 		resume = newResume
 	}
+}
+
+// readLastMob returns the last active mob name for this terminal session.
+func readLastMob(repoRoot string) string {
+	sessionID := os.Getenv("CODEMOB_SESSION")
+	if sessionID == "" {
+		return ""
+	}
+	data, err := os.ReadFile(filepath.Join(repoRoot, mob.CodemobDir, "sessions", sessionID))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
+}
+
+// writeLastMob persists the last active mob for this terminal session.
+// Uses $CODEMOB_SESSION (set once per terminal by codemob-shell.sh) as the
+// file key under .codemob/sessions/, so parallel terminals don't collide.
+func writeLastMob(workdir string) {
+	sessionID := os.Getenv("CODEMOB_SESSION")
+	if sessionID == "" {
+		return
+	}
+	root, err := mob.FindRepoRoot()
+	if err != nil {
+		return
+	}
+	sessDir := filepath.Join(root, mob.CodemobDir, "sessions")
+	os.MkdirAll(sessDir, 0755)
+	os.WriteFile(filepath.Join(sessDir, sessionID), []byte(filepath.Base(workdir)), 0644)
 }
 
 // runAgent spawns the agent process and waits for it to exit.
