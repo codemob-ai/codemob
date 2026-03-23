@@ -34,11 +34,29 @@ func repoRoot(t *testing.T) string {
 }
 
 // setupTestRepo creates a temp HOME and a git repo inside it, returns (home, repoPath).
+// It also places a fake "claude" stub on PATH so that codemob init succeeds
+// in CI environments where the real agent binaries aren't installed.
 func setupTestRepo(t *testing.T) (string, string) {
 	t.Helper()
 
 	tmpHome := t.TempDir()
 	t.Setenv("HOME", tmpHome)
+
+	// Create a fake claude binary that satisfies checkDependencies:
+	//   --version → prints a version string
+	//   auth status --json → prints {"loggedIn":true}
+	stubDir := filepath.Join(tmpHome, "bin")
+	os.MkdirAll(stubDir, 0755)
+	stubPath := filepath.Join(stubDir, "claude")
+	stubScript := `#!/bin/sh
+case "$1" in
+  --version) echo "claude-stub 0.0.0" ;;
+  auth) echo '{"loggedIn":true}' ;;
+  *) exit 0 ;;
+esac
+`
+	os.WriteFile(stubPath, []byte(stubScript), 0755)
+	t.Setenv("PATH", stubDir+":"+os.Getenv("PATH"))
 
 	repoPath := filepath.Join(tmpHome, "test-repo")
 	os.MkdirAll(repoPath, 0755)
