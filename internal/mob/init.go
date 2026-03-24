@@ -67,7 +67,7 @@ Then tell the user: "Agent switch queued. Exit this session (Ctrl+C) and codemob
 		Description: "Remove a codemob workspace",
 		Body: triggerGuard + `Run ` + "`codemob list`" + ` using the Bash tool and display the results.
 
-Determine the current mob by checking if the working directory contains ` + "`.codemob/mobs/`" + ` — if so, extract the mob name from the path.
+Determine the current mob by checking the CODEMOB_MOB environment variable.
 
 Ask the user which mob they want to remove.
 
@@ -78,9 +78,9 @@ If they choose the CURRENT mob, run ` + "`codemob queue remove <name>`" + ` and 
 	},
 	"drop": {
 		Description: "Remove the current codemob workspace and exit",
-		Body: triggerGuard + `Determine the current mob by checking if the working directory contains ` + "`.codemob/mobs/`" + ` — if so, extract the mob name from the path.
+		Body: triggerGuard + `Determine the current mob by checking the CODEMOB_MOB environment variable.
 
-If you are NOT inside a codemob worktree, tell the user: "This command can only be used from within a codemob workspace." and stop.
+If it is not set, tell the user: "This command can only be used from within a codemob workspace." and stop.
 
 Otherwise, run ` + "`codemob queue remove <name>`" + ` using the Bash tool (replace ` + "`<name>`" + ` with the current mob name).
 
@@ -601,8 +601,6 @@ func setupRepo(reprompt bool) string {
 		return ""
 	}
 
-	os.MkdirAll(filepath.Join(root, MobsDir), 0755)
-
 	// Load existing config or start with defaults
 	cfg, _ := LoadConfig(root)
 	isNew := cfg == nil
@@ -633,6 +631,39 @@ func setupRepo(reprompt bool) string {
 	if v := strings.TrimSpace(input); v != "" {
 		cfg.DefaultAgent = v
 	}
+
+	// Mobs directory prompt - show on first init or reinit when not yet configured
+	if cfg.MobsDirPath == "" {
+		repoName := filepath.Base(root)
+		home := os.Getenv("HOME")
+		enclosingPath := filepath.Join(filepath.Dir(root), ".codemob", repoName, "mobs")
+		globalPath := filepath.Join(home, ".codemob", repoName, "mobs")
+
+		fmt.Println()
+		fmt.Println("Where should mob worktrees live?")
+		fmt.Printf("  1) Project dir    %s/\n", filepath.Join(root, MobsDir))
+		fmt.Printf("  2) Enclosing dir  %s/\n", enclosingPath)
+		fmt.Printf("  3) Global dir     %s/\n", globalPath)
+		fmt.Printf("\nMobs directory [1]: ")
+		input, _ = reader.ReadString('\n')
+		choice := strings.TrimSpace(input)
+		if choice == "" {
+			choice = "1"
+		}
+
+		switch choice {
+		case "2":
+			cfg.MobsDirPath = enclosingPath
+		case "3":
+			cfg.MobsDirPath = globalPath
+		}
+		// Option 1: leave MobsDirPath empty (project-dir default)
+	}
+
+	cfg.RepoRoot = root
+
+	// Create the mobs directory
+	os.MkdirAll(MobsPath(root, cfg), 0755)
 
 	if err := SaveConfig(root, cfg); err != nil {
 		warn(fmt.Sprintf("Could not write config: %v", err))
@@ -688,9 +719,20 @@ func Uninstall(installDir string) error {
 		cfg, err := LoadConfig(repoRoot)
 		if err == nil {
 			for _, m := range cfg.Mobs {
-				worktreePath := filepath.Join(repoRoot, MobsDir, m.Name)
+				worktreePath := MobPath(repoRoot, cfg, m.Name)
 				_ = gitutil.WorktreeRemove(repoRoot, worktreePath, true)
 				gitutil.BranchDelete(repoRoot, m.Branch)
+			}
+		}
+		// Clean up external mobs directory if used
+		if cfg != nil && cfg.MobsDirPath != "" {
+			os.RemoveAll(cfg.MobsDirPath)
+			// Try to clean up parent dirs (.codemob/<repo-name>) if empty
+			parent := filepath.Dir(cfg.MobsDirPath)
+			os.Remove(parent)
+			grandparent := filepath.Dir(parent)
+			if filepath.Base(grandparent) == ".codemob" {
+				os.Remove(grandparent)
 			}
 		}
 		// Remove .codemob/ directory
