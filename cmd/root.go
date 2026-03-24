@@ -932,7 +932,6 @@ func printUsage() {
 	fmt.Println("  uninstall          Remove all codemob setup")
 	fmt.Println("")
 	fmt.Println("Options:")
-	fmt.Println("  --no-launch        Skip launching the agent")
 	fmt.Println("  --agent <name>     Override agent (default: from config)")
 	fmt.Println("  --force            Force remove")
 	fmt.Println("  --help             Show this help")
