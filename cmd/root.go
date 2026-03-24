@@ -927,7 +927,6 @@ func printUsage() {
 	fmt.Println("  reinit             Re-run initialization (idempotent)")
 	fmt.Println("  remove <name>      Remove a mob")
 	fmt.Println("  purge              Remove all mobs")
-	fmt.Println("  path [name]        Print worktree path (interactive if no name)")
 	fmt.Println("  info               Show diagnostic information")
 	fmt.Println("  uninstall          Remove all codemob setup")
 	fmt.Println("")
