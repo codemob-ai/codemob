@@ -1,6 +1,6 @@
 ![codemob](img/banner.png)
 
-🔰 **Terminal-agnostic AI agent workflow manager with parallel isolated sessions.**
+🌕 **Terminal-agnostic AI agent workflow manager with parallel isolated sessions.**
 
 _Powered by git worktrees under the hood, but you don't need to know that._
 
@@ -11,16 +11,16 @@ _Powered by git worktrees under the hood, but you don't need to know that._
 | :exclamation: Working on multiple things at once with AI agents in a single repository is a non-trivial problem. |
 |---|
 
-🔶 `claude --worktree` solves it — creates an isolated worktree, launches a session, offers to clean up when you're done. Until you decide not to clean up, because you want to come back to it later. Then it's just a directory somewhere that you need to track down, `cd` into, and relaunch the agent in manually.
+🌗 `claude --worktree` solves it — creates an isolated worktree, launches a session, offers to clean up when you're done. Until you decide not to clean up, because you want to come back to it later. Then it's just a directory somewhere that you need to track down, `cd` into, and relaunch the agent in manually.
 
-🔰 `codemob` manages the full lifecycle — _create_, _resume_, _list_, _switch_, _clean up_.
+🌕 `codemob` manages the full lifecycle — _create_, _resume_, _list_, _switch_, _clean up_.
 
 > [!NOTE]
 > **Claude** (primary focus) and **Codex** supported out of the box.
 >
 > Other terminal-based agents work too — `codemob cd` drops you into the workspace.
 
-## 🔰 How
+## 🌕 How
 
 Start a new session — codemob creates an isolated workspace and drops you into your agent:
 
