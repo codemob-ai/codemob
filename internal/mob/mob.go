@@ -32,16 +32,9 @@ type Config struct {
 
 // FindRepoRoot finds the main repo root, accounting for being inside a mob worktree.
 func FindRepoRoot() (string, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", err
+	if root := InsideWorktree(); root != "" {
+		return root, nil
 	}
-
-	// Check if we're inside a mob worktree
-	if idx := strings.Index(cwd, "/"+MobsDir+"/"); idx != -1 {
-		return cwd[:idx], nil
-	}
-
 	return gitutil.RepoRoot()
 }
 
