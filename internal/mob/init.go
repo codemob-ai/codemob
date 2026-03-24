@@ -632,35 +632,55 @@ func setupRepo(reprompt bool) string {
 		cfg.DefaultAgent = v
 	}
 
-	// Mobs directory prompt - show on first init or reinit when not yet configured
-	if cfg.MobsDirPath == "" {
-		repoName := filepath.Base(root)
-		home := os.Getenv("HOME")
-		enclosingPath := filepath.Join(filepath.Dir(root), ".codemob", repoName, "mobs")
-		globalPath := filepath.Join(home, ".codemob", repoName, "mobs")
+	// Mobs directory prompt
+	repoName := filepath.Base(root)
+	home := os.Getenv("HOME")
+	enclosingPath := filepath.Join(filepath.Dir(root), ".codemob", repoName, "mobs")
+	globalPath := filepath.Join(home, ".codemob", repoName, "mobs")
 
-		fmt.Println()
-		fmt.Println("Where should mob worktrees live?")
-		fmt.Printf("  1) Project dir    %s/\n", filepath.Join(root, MobsDir))
-		fmt.Printf("  2) Enclosing dir  %s/\n", enclosingPath)
-		fmt.Printf("  3) Global dir     %s/\n", globalPath)
-		fmt.Printf("\nMobs directory [1]: ")
-		input, _ = reader.ReadString('\n')
-		choice := strings.TrimSpace(input)
-		if choice == "" {
-			choice = "1"
-		}
-
-		switch choice {
-		case "2":
-			cfg.MobsDirPath = enclosingPath
-		case "3":
-			cfg.MobsDirPath = globalPath
-		}
-		// Option 1: leave MobsDirPath empty (project-dir default)
+	currentDefault := "1"
+	switch cfg.MobsDirPath {
+	case enclosingPath:
+		currentDefault = "2"
+	case globalPath:
+		currentDefault = "3"
+	case "":
+		currentDefault = "1"
+	default:
+		currentDefault = "1"
 	}
 
-	cfg.RepoRoot = root
+	fmt.Println()
+	fmt.Println("Where should mob worktrees live?")
+	fmt.Printf("  1) Project dir    %s/\n", filepath.Join(root, MobsDir))
+	fmt.Printf("  2) Enclosing dir  %s/\n", enclosingPath)
+	fmt.Printf("  3) Global dir     %s/\n", globalPath)
+	fmt.Printf("\nMobs directory [%s]: ", currentDefault)
+	input, _ = reader.ReadString('\n')
+	choice := strings.TrimSpace(input)
+	if choice == "" {
+		choice = currentDefault
+	}
+
+	oldMobsDir := cfg.MobsDirPath
+	switch choice {
+	case "2":
+		cfg.MobsDirPath = enclosingPath
+	case "3":
+		cfg.MobsDirPath = globalPath
+	default:
+		cfg.MobsDirPath = ""
+	}
+
+	if !isNew && oldMobsDir != cfg.MobsDirPath && len(cfg.Mobs) > 0 {
+		warn("Existing mobs remain at their current location. New mobs will use the new directory.")
+	}
+
+	if resolved, err := filepath.EvalSymlinks(root); err == nil {
+		cfg.RepoRoot = resolved
+	} else {
+		cfg.RepoRoot = root
+	}
 
 	// Create the mobs directory
 	os.MkdirAll(MobsPath(root, cfg), 0755)
@@ -724,16 +744,8 @@ func Uninstall(installDir string) error {
 				gitutil.BranchDelete(repoRoot, m.Branch)
 			}
 		}
-		// Clean up external mobs directory if used
-		if cfg != nil && cfg.MobsDirPath != "" {
-			os.RemoveAll(cfg.MobsDirPath)
-			// Try to clean up parent dirs (.codemob/<repo-name>) if empty
-			parent := filepath.Dir(cfg.MobsDirPath)
-			os.Remove(parent)
-			grandparent := filepath.Dir(parent)
-			if filepath.Base(grandparent) == ".codemob" {
-				os.Remove(grandparent)
-			}
+		if cfg != nil {
+			CleanupExternalMobsDir(cfg.MobsDirPath)
 		}
 		// Remove .codemob/ directory
 		os.RemoveAll(filepath.Join(repoRoot, CodemobDir))

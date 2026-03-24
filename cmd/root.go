@@ -228,6 +228,20 @@ func requireInit() (string, *mob.Config, error) {
 	if err != nil {
 		return "", nil, err
 	}
+	if cfg.RepoRoot != "" {
+		resolvedCfgRoot, _ := filepath.EvalSymlinks(cfg.RepoRoot)
+		resolvedRoot, _ := filepath.EvalSymlinks(root)
+		if resolvedCfgRoot == "" {
+			resolvedCfgRoot = cfg.RepoRoot
+		}
+		if resolvedRoot == "" {
+			resolvedRoot = root
+		}
+		if resolvedCfgRoot != resolvedRoot {
+			fmt.Fprintf(os.Stderr, "  \033[33m!\033[0m Repo appears to have moved (was %s). External mobs may be lost.\n", cfg.RepoRoot)
+			fmt.Fprintf(os.Stderr, "    Run 'codemob reinit' to update the config.\n")
+		}
+	}
 	if removed := mob.Reconcile(root, cfg); len(removed) > 0 {
 		_ = mob.SaveConfig(root, cfg)
 		cleanSessionFiles(root, removed...)
@@ -596,15 +610,7 @@ func cmdPurge(_ []string) error {
 		fmt.Printf("  %s✗%s Removed '%s'\n", r, rst, m.Name)
 	}
 
-	// Clean up external mobs directory if empty
-	if cfg.MobsDirPath != "" {
-		entries, err := os.ReadDir(cfg.MobsDirPath)
-		if err == nil && len(entries) == 0 {
-			os.Remove(cfg.MobsDirPath)
-			parent := filepath.Dir(cfg.MobsDirPath)
-			os.Remove(parent)
-		}
-	}
+	mob.CleanupExternalMobsDir(cfg.MobsDirPath)
 
 	cfg.Mobs = nil
 	if err := mob.SaveConfig(root, cfg); err != nil {
