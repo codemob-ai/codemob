@@ -789,6 +789,8 @@ func launchAgent(root, agent, workdir string, resume bool) error {
 			}
 		}
 
+		mobStatus(fmt.Sprintf("Session ended - mob '%s'", filepath.Base(workdir)))
+
 		// Always check for queued action, regardless of how the agent exited
 		next, err := mob.ReadQueuedAction(root)
 		if err != nil || next == nil {
