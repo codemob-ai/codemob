@@ -26,6 +26,10 @@ Other terminal-based agents work too - `codemob cd` drops you into the workspace
 
 ## How
 
+TBD
+
+## Examples
+
 Start a new session - codemob creates an isolated workspace and drops you into your agent:
 
 ```bash
