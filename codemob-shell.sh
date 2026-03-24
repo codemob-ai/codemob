@@ -35,11 +35,14 @@ claude() {
     --switch-mob|--switch-codemob)       shift; codemob switch "$@"; return $? ;;
     --list-mob|--list-mobs|--list-codemob|--list-codemobs) shift; codemob list "$@"; return $? ;;
     *)
-      local extra_args=()
+      local extra_args=() codemob_mob=""
       while IFS= read -r line; do
-        extra_args+=("$line")
+        case "$line" in
+          CODEMOB_MOB=*) codemob_mob="${line#CODEMOB_MOB=}" ;;
+          *) extra_args+=("$line") ;;
+        esac
       done < <(command codemob inject-args claude 2>/dev/null)
-      command claude "${extra_args[@]}" "$@"
+      CODEMOB_MOB="$codemob_mob" command claude "${extra_args[@]}" "$@"
       local ec=$?
       codemob check-queue 2>/dev/null
       return $ec
@@ -55,11 +58,14 @@ codex() {
     --switch-mob|--switch-codemob)       shift; codemob switch "$@"; return $? ;;
     --list-mob|--list-mobs|--list-codemob|--list-codemobs) shift; codemob list "$@"; return $? ;;
     *)
-      local extra_args=()
+      local extra_args=() codemob_mob=""
       while IFS= read -r line; do
-        extra_args+=("$line")
+        case "$line" in
+          CODEMOB_MOB=*) codemob_mob="${line#CODEMOB_MOB=}" ;;
+          *) extra_args+=("$line") ;;
+        esac
       done < <(command codemob inject-args codex 2>/dev/null)
-      command codex "${extra_args[@]}" "$@"
+      CODEMOB_MOB="$codemob_mob" command codex "${extra_args[@]}" "$@"
       local ec=$?
       codemob check-queue 2>/dev/null
       return $ec
