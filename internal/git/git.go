@@ -22,6 +22,14 @@ func RepoRoot() (string, error) {
 	return strings.TrimSpace(out), nil
 }
 
+func CommonDir() (string, error) {
+	out, err := runGit("", "rev-parse", "--git-common-dir")
+	if err != nil {
+		return "", fmt.Errorf("not inside a git repository")
+	}
+	return strings.TrimSpace(out), nil
+}
+
 func WorktreeList(repoRoot string) ([]WorktreeInfo, error) {
 	out, err := runGit(repoRoot, "worktree", "list", "--porcelain")
 	if err != nil {

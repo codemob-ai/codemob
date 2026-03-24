@@ -27,7 +27,23 @@ type Mob struct {
 type Config struct {
 	DefaultAgent string `json:"default_agent"`
 	BaseBranch   string `json:"base_branch"`
+	RepoRoot     string `json:"repo_root,omitempty"`
+	MobsDirPath  string `json:"mobs_dir,omitempty"`
 	Mobs         []Mob  `json:"mobs"`
+}
+
+// MobsPath returns the absolute path to the mobs directory.
+// If MobsDirPath is set, it's used directly; otherwise falls back to <repoRoot>/.codemob/mobs.
+func MobsPath(repoRoot string, cfg *Config) string {
+	if cfg != nil && cfg.MobsDirPath != "" {
+		return cfg.MobsDirPath
+	}
+	return filepath.Join(repoRoot, MobsDir)
+}
+
+// MobPath returns the absolute path to a specific mob's worktree.
+func MobPath(repoRoot string, cfg *Config, name string) string {
+	return filepath.Join(MobsPath(repoRoot, cfg), name)
 }
 
 // FindRepoRoot finds the main repo root, accounting for being inside a mob worktree.
@@ -45,10 +61,41 @@ func InsideWorktree() string {
 	if err != nil {
 		return ""
 	}
+
+	// Fast path: project-dir mode (worktrees inside the repo)
 	if idx := strings.Index(cwd, "/"+MobsDir+"/"); idx != -1 {
 		return cwd[:idx]
 	}
-	return ""
+
+	// Slow path: external worktrees - use git to detect
+	toplevel, err := gitutil.RepoRoot()
+	if err != nil {
+		return ""
+	}
+	commonDir, err := gitutil.CommonDir()
+	if err != nil {
+		return ""
+	}
+
+	// Make commonDir absolute if relative
+	if !filepath.IsAbs(commonDir) {
+		commonDir = filepath.Join(toplevel, commonDir)
+	}
+	commonDir = filepath.Clean(commonDir)
+
+	// The main repo root is the parent of .git (commonDir)
+	mainRoot := filepath.Dir(commonDir)
+
+	// If toplevel == mainRoot, we're in the main repo, not a worktree
+	if toplevel == mainRoot {
+		return ""
+	}
+
+	// We're in a worktree. Check if the main repo has codemob initialized.
+	if _, err := os.Stat(filepath.Join(mainRoot, ConfigFile)); err != nil {
+		return ""
+	}
+	return mainRoot
 }
 
 // IsInitialized checks if codemob is initialized in the given repo.
@@ -85,7 +132,7 @@ func Reconcile(repoRoot string, cfg *Config) []string {
 	var removed []string
 	valid := make([]Mob, 0)
 	for _, m := range cfg.Mobs {
-		mobPath := filepath.Join(repoRoot, MobsDir, m.Name)
+		mobPath := MobPath(repoRoot, cfg, m.Name)
 		if _, err := os.Stat(mobPath); err == nil {
 			valid = append(valid, m)
 		} else {
@@ -128,6 +175,11 @@ func ValidateName(name string) error {
 
 // CurrentMobName returns the name of the mob we're currently inside, or "" if not in a mob.
 func CurrentMobName() string {
+	if name := os.Getenv("CODEMOB_MOB"); name != "" {
+		return name
+	}
+
+	// Fallback: path-based detection (works for project-dir mode)
 	cwd, err := os.Getwd()
 	if err != nil {
 		return ""
@@ -138,7 +190,6 @@ func CurrentMobName() string {
 		return ""
 	}
 	rest := cwd[idx+len(marker):]
-	// Take the first path component
 	if slash := strings.Index(rest, "/"); slash != -1 {
 		return rest[:slash]
 	}
