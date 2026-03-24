@@ -491,7 +491,11 @@ func cmdRemove(args []string) error {
 	}
 
 	if name == "" {
-		return fmt.Errorf("mob name required")
+		picked, err := pickMob(cfg, pickerOpts{})
+		if err != nil {
+			return err
+		}
+		name = picked
 	}
 
 	m := resolveMob(cfg, name)
@@ -784,6 +788,8 @@ func launchAgent(root, agent, workdir string, resume bool) error {
 				fmt.Fprintf(os.Stderr, "  [codemob] agent error: %v\n", err)
 			}
 		}
+
+		mobStatus(fmt.Sprintf("Session ended - mob '%s'", filepath.Base(workdir)))
 
 		// Always check for queued action, regardless of how the agent exited
 		next, err := mob.ReadQueuedAction(root)
