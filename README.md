@@ -16,7 +16,7 @@ _Powered by git worktrees under the hood, but you don't need to know that._
 【🌕】`codemob` manages the full lifecycle - _create_, _resume_, _list_, _switch_, _clean up_.
 
 <details>
-<summary>🤖 Supported agents</summary>
+<summary>✨ Supported agents</summary>
 <br>
 
 **Claude** (primary focus) and **Codex** supported out of the box.
