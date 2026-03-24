@@ -114,6 +114,10 @@ Makefile                # build/install/test
 }
 ```
 
+## Design philosophy
+
+codemob is early-stage. Optimize for the common user, not power users. Consider what power users want/need, but don't add complexity to accommodate edge cases they create (e.g., hand-editing config files). Keep the product simple and predictable - complexity is the enemy at this stage.
+
 ## CLI conventions
 
 **Flag rejection:** Every command must explicitly reject unknown `--` flags with a clear error. Never silently treat a flag-like arg as a positional value (e.g., `--typo` should not become a mob name). Each command's arg-parsing loop has its own `strings.HasPrefix(arg, "--")` check in the default branch.
