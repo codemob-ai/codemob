@@ -6,11 +6,6 @@
 
 ---
 
-> [!IMPORTANT]
-> `codemob` and `mob` are interchangeable everywhere - commands, flags, slash commands.
->
-> `codemob new` = `mob new`, `claude --new-codemob` = `claude --new-mob`, `/codemob-new` = `/mob-new`
-
 ## Why
 
 > [!WARNING]
@@ -136,6 +131,11 @@ codemob init
 ```
 
 ## Usage
+
+> [!IMPORTANT]
+> `codemob` and `mob` are interchangeable everywhere - commands, flags, slash commands.
+>
+> `codemob new` = `mob new`, `claude --new-codemob` = `claude --new-mob`, `/codemob-new` = `/mob-new`
 
 ```bash
 # start
