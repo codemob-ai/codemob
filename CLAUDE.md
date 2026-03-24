@@ -120,6 +120,8 @@ Makefile                # build/install/test
 
 **Interactive picker:** When a command needs the user to select a mob, use the shared `pickMob()` function in `root.go`. Configure it via `pickerOpts` (marker, default value, root hint, output writer) rather than duplicating the table/prompt logic.
 
+**Bug fixes need tests:** When fixing a bug - whether reported by the user or discovered independently - always consider adding a regression test in `integration_test.go`. The test suite is comprehensive and easy to extend. A bug that was worth fixing is worth preventing from coming back.
+
 ## Core/shell interface
 
 The Go binary is the primary interface — it handles everything including agent launching (as child processes with a trampoline loop). The shell script is an optional enhancement that provides `mob` alias and `claude --new-mob` / `codex --new-mob` wrappers, plus post-exit queue checking.
