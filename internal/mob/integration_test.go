@@ -785,6 +785,35 @@ func TestResumeRejectsUnknownFlags(t *testing.T) {
 	}
 }
 
+func TestNewRejectsUnknownFlags(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	// when
+	out := runCoreExpectError(t, bin, repoPath, "new", "--typo", "--no-launch")
+
+	// then
+	if !strings.Contains(out, "unknown flag") {
+		t.Errorf("expected unknown flag error, got: %s", out)
+	}
+}
+
+func TestRemoveRejectsUnknownFlags(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "test-mob", "--no-launch")
+
+	// when
+	out := runCoreExpectError(t, bin, repoPath, "remove", "--typo")
+
+	// then
+	if !strings.Contains(out, "unknown flag") {
+		t.Errorf("expected unknown flag error, got: %s", out)
+	}
+}
+
 // ─── Session Tracking ─────────────────────────────────────────────────────────
 
 // writeSessionFile creates a session file mapping a session ID to a mob name.
@@ -943,6 +972,95 @@ func TestNewMobWithCustomAgent(t *testing.T) {
 	mob := mobs[0].(map[string]interface{})
 	if mob["agent"] != "codex" {
 		t.Errorf("expected agent=codex in config, got %v", mob["agent"])
+	}
+}
+
+// ─── Open ────────────────────────────────────────────────────────────────────
+
+func TestOpenRejectsUnknownFlags(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "open-test", "--no-launch")
+
+	// when
+	out := runCoreExpectError(t, bin, repoPath, "open", "--typo")
+
+	// then
+	if !strings.Contains(out, "unknown flag") {
+		t.Errorf("expected 'unknown flag' error, got: %s", out)
+	}
+}
+
+func TestOpenNotFound(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "exists", "--no-launch")
+
+	// when
+	out := runCoreExpectError(t, bin, repoPath, "open", "nonexistent")
+
+	// then
+	if !strings.Contains(out, "not found") {
+		t.Errorf("expected 'not found' error, got: %s", out)
+	}
+}
+
+func TestOpenNoMobs(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	// when
+	out := runCoreExpectError(t, bin, repoPath, "open", "anything")
+
+	// then
+	if !strings.Contains(out, "not found") {
+		t.Errorf("expected 'not found' error, got: %s", out)
+	}
+}
+
+func TestOpenAgentMissingValue(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "agent-test", "--no-launch")
+
+	// when
+	out := runCoreExpectError(t, bin, repoPath, "open", "agent-test", "--agent")
+
+	// then
+	if !strings.Contains(out, "--agent requires a value") {
+		t.Errorf("expected '--agent requires a value' error, got: %s", out)
+	}
+}
+
+func TestOpenAgentOverridePersistsToConfig(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "agent-persist", "--no-launch")
+
+	// given -> mob was created with default agent (claude)
+	cfg := readConfig(t, repoPath)
+	mobs := cfg["mobs"].([]interface{})
+	mob := mobs[0].(map[string]interface{})
+	if mob["agent"] != "claude" {
+		t.Fatalf("expected initial agent=claude, got %v", mob["agent"])
+	}
+
+	// when -> open with --agent codex (may succeed or fail depending on codex availability)
+	cmd := exec.Command(bin, "open", "agent-persist", "--agent", "codex")
+	cmd.Dir = repoPath
+	cmd.Run() // ignore exit code - agent launch may fail, config update happens before launch
+
+	// then -> config should now say codex
+	cfg = readConfig(t, repoPath)
+	mobs = cfg["mobs"].([]interface{})
+	mob = mobs[0].(map[string]interface{})
+	if mob["agent"] != "codex" {
+		t.Errorf("expected agent=codex after --agent override, got %v", mob["agent"])
 	}
 }
 

@@ -28,12 +28,17 @@ Two layers:
 Commands:
 ```
 codemob new [name]          # create mob + launch agent
-codemob resume [name]       # resume a mob (launch agent in worktree)
+codemob resume [name]       # resume a mob (continue previous session)
+codemob open [name]         # open a mob (fresh agent session)
 codemob list                # list all mobs
+codemob path [name]         # print worktree path (interactive if no name)
+codemob cd <name>           # cd into a mob's worktree (shell function)
+codemob cd root             # cd back to repo root
 codemob init                # first-time setup (global + repo)
 codemob reinit              # alias for init (idempotent)
 codemob remove <name>       # remove a mob (accepts name or index)
 codemob purge               # remove all mobs (with confirmation)
+codemob info                # show diagnostic information
 codemob uninstall           # remove all codemob setup (global + local)
 ```
 
@@ -50,8 +55,10 @@ Claude/Codex wrappers (installed by init):
 claude --mob [name]         # → codemob new --agent claude [name]
 claude --new-mob [name]     # same as --mob
 claude --resume-mob <name>  # → codemob resume <name>
+claude --open-mob <name>    # → codemob open --agent claude <name>
 codex --mob [name]          # → codemob new --agent codex [name]
 codex --resume-mob <name>   # → codemob resume <name>
+codex --open-mob <name>     # → codemob open --agent codex <name>
 ```
 
 ## Build
@@ -106,6 +113,14 @@ Makefile                # build/install/test
   "mob": ""
 }
 ```
+
+## CLI conventions
+
+**Flag rejection:** Every command must explicitly reject unknown `--` flags with a clear error. Never silently treat a flag-like arg as a positional value (e.g., `--typo` should not become a mob name). Each command's arg-parsing loop has its own `strings.HasPrefix(arg, "--")` check in the default branch.
+
+**Interactive picker:** When a command needs the user to select a mob, use the shared `pickMob()` function in `root.go`. Configure it via `pickerOpts` (marker, default value, root hint, output writer) rather than duplicating the table/prompt logic.
+
+**Bug fixes need tests:** When fixing a bug - whether reported by the user or discovered independently - always consider adding a regression test in `integration_test.go`. The test suite is comprehensive and easy to extend. A bug that was worth fixing is worth preventing from coming back.
 
 ## Core/shell interface
 

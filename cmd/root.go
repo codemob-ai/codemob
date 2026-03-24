@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"syscall"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -15,33 +16,34 @@ import (
 	"github.com/codemob-ai/codemob/internal/mob"
 )
 
+func brandPrefix(color string) string {
+	if color == "" {
+		color = "\033[38;2;231;220;96m"
+	}
+	return fmt.Sprintf("  %s【●】codemob\033[0m  ", color)
+}
+
 func mobStatus(msg string) {
 	fmt.Println()
-	// Brand accent: #e7dc60
-	fmt.Printf("  \033[38;2;231;220;96m● codemob\033[0m  %s\n", msg)
+	fmt.Printf("%s%s\n", brandPrefix(""), msg)
 	fmt.Println()
 }
 
-// mobProgress prints a transient progress line and returns a handle to finish it.
-// Use defer p.Clear() immediately after calling to guarantee cleanup on any exit path.
 type progress struct{ active bool }
 
 func mobProgress(msg string) *progress {
-	// Leading blank line + message, no trailing newline — cursor stays on this line
-	fmt.Printf("\n  \033[38;2;231;220;96m● codemob\033[0m  %s", msg)
+	fmt.Printf("\n%s%s", brandPrefix(""), msg)
 	return &progress{active: true}
 }
 
-// Done replaces the progress line with a final status message.
 func (p *progress) Done(msg string) {
 	if !p.active {
 		return
 	}
 	p.active = false
-	fmt.Printf("\r\033[2K  \033[38;2;231;220;96m● codemob\033[0m  %s\n\n", msg)
+	fmt.Printf("\r\033[2K%s%s\n\n", brandPrefix(""), msg)
 }
 
-// Clear removes the progress line without replacing it.
 func (p *progress) Clear() {
 	if !p.active {
 		return
@@ -89,6 +91,8 @@ func Execute() error {
 		return cmdPurge(args)
 	case "path":
 		return cmdPath(args)
+	case "open":
+		return cmdOpen(args)
 	case "info":
 		return cmdInfo()
 
@@ -124,14 +128,64 @@ func cmdUninstall(_ []string) error {
 
 // resolveMob finds a mob by name or 1-based index.
 func resolveMob(cfg *mob.Config, nameOrIndex string) *mob.Mob {
-	// Try as index first
 	if idx, err := strconv.Atoi(nameOrIndex); err == nil {
 		if idx >= 1 && idx <= len(cfg.Mobs) {
 			return &cfg.Mobs[idx-1]
 		}
 	}
-	// Fall back to name
 	return mob.FindMob(cfg, nameOrIndex)
+}
+
+type pickerOpts struct {
+	out        *os.File // output for table and prompt (default: os.Stdout)
+	markerName string   // mob name to mark with ◀ (e.g., last session mob)
+	defaultVal string   // pre-filled default shown in prompt bracket; enter selects it
+	showRoot   bool     // show "0 — repo root" hint (for cd/path)
+}
+
+func pickMob(cfg *mob.Config, opts pickerOpts) (string, error) {
+	if len(cfg.Mobs) == 0 {
+		return "", fmt.Errorf("no mobs. Create one with: codemob new")
+	}
+	if len(cfg.Mobs) == 1 && opts.defaultVal == "" && !opts.showRoot {
+		return cfg.Mobs[0].Name, nil
+	}
+
+	out := opts.out
+	if out == nil {
+		out = os.Stdout
+	}
+
+	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "#\tNAME\tBRANCH\tLAST AGENT\tCREATED")
+	for i, m := range cfg.Mobs {
+		marker := ""
+		if m.Name == opts.markerName {
+			marker = " ◀"
+		}
+		fmt.Fprintf(w, "%d\t%s%s\t%s\t%s\t%s\n", i+1, m.Name, marker, m.Branch, m.Agent, mob.RelativeTime(m.CreatedAt))
+	}
+	w.Flush()
+
+	if opts.showRoot {
+		fmt.Fprintf(out, "\n  \033[38;2;100;180;220m> enter 0 to cd back to repo root\033[0m\n")
+	}
+
+	if opts.defaultVal != "" {
+		fmt.Fprintf(out, "\nWhich mob? (#/name) [%s]: ", opts.defaultVal)
+	} else {
+		fmt.Fprint(out, "\nWhich mob? (#/name): ")
+	}
+
+	var name string
+	fmt.Scanln(&name)
+	if name == "" {
+		name = opts.defaultVal
+	}
+	if name == "" {
+		return "", fmt.Errorf("no mob selected")
+	}
+	return name, nil
 }
 
 func cmdInit(_ []string, forceReprompt bool) error {
@@ -162,6 +216,73 @@ func requireInit() (string, *mob.Config, error) {
 	return root, cfg, nil
 }
 
+// createMob handles the full mob-creation sequence: name validation/generation,
+// worktree creation, config update, and save. Returns the worktree path.
+func createMob(root string, cfg *mob.Config, name, agent string) (string, error) {
+	if name == "" {
+		name = mob.GenerateUniqueName(cfg)
+	} else {
+		if err := mob.ValidateName(name); err != nil {
+			return "", err
+		}
+		if m := mob.FindMob(cfg, name); m != nil {
+			return "", fmt.Errorf("mob '%s' already exists", name)
+		}
+	}
+
+	branch := "mob/" + name
+	worktreePath := filepath.Join(root, mob.MobsDir, name)
+
+	p := mobProgress(fmt.Sprintf("Creating mob '%s'...", name))
+	defer p.Clear()
+
+	if err := gitutil.WorktreeAdd(root, worktreePath, branch, cfg.BaseBranch); err != nil {
+		return "", err
+	}
+
+	cfg.Mobs = append(cfg.Mobs, mob.Mob{
+		Name:      name,
+		Branch:    branch,
+		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+		Agent:     agent,
+	})
+
+	if err := mob.SaveConfig(root, cfg); err != nil {
+		return "", err
+	}
+
+	p.Done(fmt.Sprintf("Created mob '%s' on branch %s", name, branch))
+	return worktreePath, nil
+}
+
+// removeMob handles the full mob-removal sequence: worktree removal, branch deletion,
+// config update, save, and session file cleanup.
+func removeMob(root string, cfg *mob.Config, m *mob.Mob, force bool) error {
+	worktreePath := filepath.Join(root, mob.MobsDir, m.Name)
+	if _, err := os.Stat(worktreePath); err == nil {
+		if err := gitutil.WorktreeRemove(root, worktreePath, force); err != nil {
+			return err
+		}
+	}
+
+	gitutil.BranchDelete(root, m.Branch)
+
+	var remaining []mob.Mob
+	for _, existing := range cfg.Mobs {
+		if existing.Name != m.Name {
+			remaining = append(remaining, existing)
+		}
+	}
+	cfg.Mobs = remaining
+
+	if err := mob.SaveConfig(root, cfg); err != nil {
+		return err
+	}
+
+	cleanSessionFiles(root, m.Name)
+	return nil
+}
+
 func cmdNew(args []string) error {
 	root, cfg, err := requireInit()
 	if err != nil {
@@ -173,15 +294,17 @@ func cmdNew(args []string) error {
 	noLaunch := false
 
 	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--no-launch":
+		switch {
+		case args[i] == "--no-launch":
 			noLaunch = true
-		case "--agent":
+		case args[i] == "--agent":
 			if i+1 >= len(args) {
 				return fmt.Errorf("--agent requires a value (e.g., --agent codex)")
 			}
 			agent = args[i+1]
 			i++
+		case strings.HasPrefix(args[i], "--"):
+			return fmt.Errorf("unknown flag for new: %s", args[i])
 		default:
 			if name == "" {
 				name = args[i]
@@ -189,39 +312,10 @@ func cmdNew(args []string) error {
 		}
 	}
 
-	if name == "" {
-		name = mob.GenerateUniqueName(cfg)
-	} else {
-		if err := mob.ValidateName(name); err != nil {
-			return err
-		}
-		if m := mob.FindMob(cfg, name); m != nil {
-			return fmt.Errorf("mob '%s' already exists", name)
-		}
-	}
-
-	branch := "mob/" + name
-	worktreePath := filepath.Join(root, mob.MobsDir, name)
-
-	p := mobProgress(fmt.Sprintf("Creating mob '%s'...", name))
-	defer p.Clear()
-
-	if err := gitutil.WorktreeAdd(root, worktreePath, branch, cfg.BaseBranch); err != nil {
+	worktreePath, err := createMob(root, cfg, name, agent)
+	if err != nil {
 		return err
 	}
-
-	cfg.Mobs = append(cfg.Mobs, mob.Mob{
-		Name:      name,
-		Branch:    branch,
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
-		Agent:     agent,
-	})
-
-	if err := mob.SaveConfig(root, cfg); err != nil {
-		return err
-	}
-
-	p.Done(fmt.Sprintf("Created mob '%s' on branch %s", name, branch))
 
 	if !noLaunch {
 		return launchAgent(root, agent, worktreePath, false)
@@ -288,36 +382,17 @@ func cmdResume(args []string) error {
 	}
 
 	if name == "" {
-		if len(cfg.Mobs) == 0 {
-			return fmt.Errorf("no mobs. Create one with: codemob new")
+		lastMob := readLastMob(root)
+		if lastMob != "" && mob.FindMob(cfg, lastMob) == nil {
+			lastMob = ""
 		}
-		if len(cfg.Mobs) == 1 {
-			name = cfg.Mobs[0].Name
-		} else {
-			lastMob := readLastMob(root)
-			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-			fmt.Fprintln(w, "#\tNAME\tBRANCH\tLAST AGENT\tCREATED")
-			for i, m := range cfg.Mobs {
-				marker := ""
-				if m.Name == lastMob {
-					marker = " ◀"
-				}
-				fmt.Fprintf(w, "%d\t%s%s\t%s\t%s\t%s\n", i+1, m.Name, marker, m.Branch, m.Agent, mob.RelativeTime(m.CreatedAt))
-			}
-			w.Flush()
-			if lastMob != "" && mob.FindMob(cfg, lastMob) != nil {
-				fmt.Printf("\nWhich mob? (#/name) [%s]: ", lastMob)
-			} else {
-				fmt.Print("\nWhich mob? (#/name): ")
-				lastMob = ""
-			}
-			fmt.Scanln(&name)
-			if name == "" {
-				name = lastMob
-			}
-		}
-		if name == "" {
-			return fmt.Errorf("no mob selected")
+		var err error
+		name, err = pickMob(cfg, pickerOpts{
+			markerName: lastMob,
+			defaultVal: lastMob,
+		})
+		if err != nil {
+			return err
 		}
 	}
 
@@ -336,6 +411,64 @@ func cmdResume(args []string) error {
 }
 
 
+func cmdOpen(args []string) error {
+	root, cfg, err := requireInit()
+	if err != nil {
+		return err
+	}
+
+	name := ""
+	agent := ""
+	for i := 0; i < len(args); i++ {
+		switch {
+		case args[i] == "--agent":
+			if i+1 >= len(args) {
+				return fmt.Errorf("--agent requires a value (e.g., --agent codex)")
+			}
+			agent = args[i+1]
+			i++
+		case strings.HasPrefix(args[i], "--"):
+			return fmt.Errorf("unknown flag for open: %s", args[i])
+		default:
+			if name == "" {
+				name = args[i]
+			}
+		}
+	}
+
+	if name == "" {
+		lastMob := readLastMob(root)
+		if lastMob != "" && mob.FindMob(cfg, lastMob) == nil {
+			lastMob = ""
+		}
+		var err error
+		name, err = pickMob(cfg, pickerOpts{
+			markerName: lastMob,
+			defaultVal: lastMob,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	m := resolveMob(cfg, name)
+	if m == nil {
+		return fmt.Errorf("mob '%s' not found", name)
+	}
+
+	if agent == "" {
+		agent = m.Agent
+	} else if agent != m.Agent {
+		m.Agent = agent
+		_ = mob.SaveConfig(root, cfg)
+	}
+
+	worktreePath := filepath.Join(root, mob.MobsDir, m.Name)
+	mobStatus(fmt.Sprintf("Opening mob '%s' (fresh session)", m.Name))
+
+	return launchAgent(root, agent, worktreePath, false)
+}
+
 func cmdRemove(args []string) error {
 	root, cfg, err := requireInit()
 	if err != nil {
@@ -345,9 +478,11 @@ func cmdRemove(args []string) error {
 	name := ""
 	force := false
 	for _, arg := range args {
-		switch arg {
-		case "--force", "-f":
+		switch {
+		case arg == "--force" || arg == "-f":
 			force = true
+		case strings.HasPrefix(arg, "--"):
+			return fmt.Errorf("unknown flag for remove: %s", arg)
 		default:
 			if name == "" {
 				name = arg
@@ -364,28 +499,10 @@ func cmdRemove(args []string) error {
 		return fmt.Errorf("mob '%s' not found", name)
 	}
 
-	worktreePath := filepath.Join(root, mob.MobsDir, m.Name)
-	if _, err := os.Stat(worktreePath); err == nil {
-		if err := gitutil.WorktreeRemove(root, worktreePath, force); err != nil {
-			return err
-		}
-	}
-
-	_ = gitutil.BranchDelete(root, m.Branch)
-
-	var remaining []mob.Mob
-	for _, existing := range cfg.Mobs {
-		if existing.Name != m.Name {
-			remaining = append(remaining, existing)
-		}
-	}
-	cfg.Mobs = remaining
-
-	if err := mob.SaveConfig(root, cfg); err != nil {
+	if err := removeMob(root, cfg, m, force); err != nil {
 		return err
 	}
 
-	cleanSessionFiles(root, m.Name)
 	mobStatus(fmt.Sprintf("Removed mob '%s'", m.Name))
 	return nil
 }
@@ -452,7 +569,7 @@ func cmdPurge(_ []string) error {
 		if _, err := os.Stat(worktreePath); err == nil {
 			_ = gitutil.WorktreeRemove(root, worktreePath, true)
 		}
-		_ = gitutil.BranchDelete(root, m.Branch)
+		gitutil.BranchDelete(root, m.Branch)
 		fmt.Printf("  %s✗%s Removed '%s'\n", r, rst, m.Name)
 	}
 
@@ -464,7 +581,7 @@ func cmdPurge(_ []string) error {
 	os.RemoveAll(filepath.Join(root, mob.CodemobDir, "sessions"))
 
 	fmt.Println()
-	fmt.Printf("  %s● codemob%s  All mobs purged\n", r, rst)
+	fmt.Printf("%sAll mobs purged\n", brandPrefix(r))
 	fmt.Println()
 	return nil
 }
@@ -485,29 +602,15 @@ func cmdPath(args []string) error {
 		return nil
 	}
 
-	if len(cfg.Mobs) == 0 {
-		return fmt.Errorf("no mobs. Create one with: codemob new")
-	}
-
 	if name == "" {
-		if len(cfg.Mobs) == 1 && mob.CurrentMobName() == "" {
-			name = cfg.Mobs[0].Name
-		} else {
-			inMob := mob.CurrentMobName() != ""
-			w := tabwriter.NewWriter(os.Stderr, 0, 0, 2, ' ', 0)
-			fmt.Fprintln(w, "#\tNAME\tBRANCH\tLAST AGENT\tCREATED")
-			for i, m := range cfg.Mobs {
-				fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", i+1, m.Name, m.Branch, m.Agent, mob.RelativeTime(m.CreatedAt))
-			}
-			w.Flush()
-			if inMob {
-				fmt.Fprintf(os.Stderr, "\n  \033[38;2;100;180;220m> enter 0 to cd back to repo root\033[0m\n")
-			}
-			fmt.Fprint(os.Stderr, "\nWhich mob? (#/name): ")
-			fmt.Scanln(&name)
-		}
-		if name == "" {
-			return fmt.Errorf("no mob selected")
+		inMob := mob.CurrentMobName() != ""
+		var err error
+		name, err = pickMob(cfg, pickerOpts{
+			out:      os.Stderr,
+			showRoot: inMob,
+		})
+		if err != nil {
+			return err
 		}
 	}
 
@@ -579,43 +682,14 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 		return filepath.Join(root, mob.MobsDir, m.Name), newAgent, false, nil
 
 	case "new":
-		name := next.Target
-		if name == "" {
-			name = mob.GenerateUniqueName(cfg)
-		} else {
-			if err := mob.ValidateName(name); err != nil {
-				return "", "", false, err
-			}
-			if m := mob.FindMob(cfg, name); m != nil {
-				return "", "", false, fmt.Errorf("mob '%s' already exists", name)
-			}
-		}
-		branch := "mob/" + name
-		worktreePath := filepath.Join(root, mob.MobsDir, name)
-
-		p := mobProgress(fmt.Sprintf("Creating mob '%s'...", name))
-		defer p.Clear()
-
-		if err := gitutil.WorktreeAdd(root, worktreePath, branch, cfg.BaseBranch); err != nil {
-			return "", "", false, err
-		}
-
 		agent := next.Agent
 		if agent == "" {
 			agent = cfg.DefaultAgent
 		}
-
-		cfg.Mobs = append(cfg.Mobs, mob.Mob{
-			Name:      name,
-			Branch:    branch,
-			CreatedAt: time.Now().UTC().Format(time.RFC3339),
-			Agent:     agent,
-		})
-		if err := mob.SaveConfig(root, cfg); err != nil {
+		worktreePath, err := createMob(root, cfg, next.Target, agent)
+		if err != nil {
 			return "", "", false, err
 		}
-
-		p.Done(fmt.Sprintf("Created mob '%s' on branch %s", name, branch))
 		return worktreePath, agent, false, nil
 
 	case "remove":
@@ -627,22 +701,11 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 		if m == nil {
 			return "", "", false, fmt.Errorf("mob '%s' not found", name)
 		}
-		worktreePath := filepath.Join(root, mob.MobsDir, m.Name)
-		if _, statErr := os.Stat(worktreePath); statErr == nil {
-			_ = gitutil.WorktreeRemove(root, worktreePath, true)
+		if err := removeMob(root, cfg, m, true); err != nil {
+			return "", "", false, err
 		}
-		_ = gitutil.BranchDelete(root, m.Branch)
-		var remaining []mob.Mob
-		for _, existing := range cfg.Mobs {
-			if existing.Name != m.Name {
-				remaining = append(remaining, existing)
-			}
-		}
-		cfg.Mobs = remaining
-		_ = mob.SaveConfig(root, cfg)
-		cleanSessionFiles(root, m.Name)
 		mobStatus(fmt.Sprintf("Removed mob '%s'", m.Name))
-		return "", "", false, nil // no agent to launch
+		return "", "", false, nil
 
 	default:
 		return "", "", false, fmt.Errorf("unknown next action: %s", next.Action)
@@ -815,7 +878,7 @@ func agentArgs(agent, repoRoot string) (binPath string, resumeArgs, newArgs []st
 		resumeArgs = []string{"resume", "--last", "--add-dir", repoRoot}
 		newArgs = []string{"--add-dir", repoRoot}
 	default:
-		err = fmt.Errorf("unknown agent: %s", agent)
+		return "", nil, nil, fmt.Errorf("unknown agent: %s", agent)
 	}
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("agent '%s' not found on PATH", agent)
@@ -832,7 +895,7 @@ func spawnAgent(binPath string, args []string, workdir string) error {
 
 	// Forward signals to child, clean up goroutine on exit
 	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 	done := make(chan struct{})
 	go func() {
 		select {
@@ -858,17 +921,16 @@ func printUsage() {
 	fmt.Println("Commands:")
 	fmt.Println("  new [name]         Create a new mob and launch agent")
 	fmt.Println("  list               List all mobs")
-	fmt.Println("  resume [name]      Resume a mob (launch agent in worktree)")
+	fmt.Println("  resume [name]      Resume a mob (continue previous session)")
+	fmt.Println("  open [name]        Open a mob (fresh agent session)")
 	fmt.Println("  init               Initialize codemob (global + repo setup)")
 	fmt.Println("  reinit             Re-run initialization (idempotent)")
 	fmt.Println("  remove <name>      Remove a mob")
 	fmt.Println("  purge              Remove all mobs")
-	fmt.Println("  path [name]        Print worktree path (interactive if no name)")
 	fmt.Println("  info               Show diagnostic information")
 	fmt.Println("  uninstall          Remove all codemob setup")
 	fmt.Println("")
 	fmt.Println("Options:")
-	fmt.Println("  --no-launch        Skip launching the agent")
 	fmt.Println("  --agent <name>     Override agent (default: from config)")
 	fmt.Println("  --force            Force remove")
 	fmt.Println("  --help             Show this help")

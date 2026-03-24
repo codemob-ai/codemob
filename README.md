@@ -133,27 +133,40 @@ codemob init
 ## Usage
 
 > [!IMPORTANT]
-> `codemob` and `mob` are interchangeable everywhere - commands, flags, slash commands.
+> **`codemob` and `mob` are interchangeable everywhere** - commands, flags, slash commands.
 >
 > `codemob new` = `mob new`, `claude --new-codemob` = `claude --new-mob`, `/codemob-new` = `/mob-new`
 
 ```bash
-# start
+# create
 codemob new                      # auto-generated name, default agent
 codemob new brave-mango          # named mob
 codemob new --agent codex        # pick agent
-claude --new-codemob             # shorthand, launches claude
-claude --new-codemob brave-mango # shorthand with name
-claude --codemob                 # even shorter
-codex --new-codemob              # shorthand, launches codex
+
+# resume / open
+codemob resume brave-mango       # continue previous session
+codemob open brave-mango         # fresh agent session
+
+# navigate
+codemob cd brave-mango           # cd into a mob's worktree
+codemob cd root                  # cd back to the main repo
 
 # manage
 codemob list                     # list mobs (with indices)
-codemob resume brave-mango       # resume by name
 codemob resume 2                 # resume by index
 codemob remove brave-mango       # remove one
 codemob purge                    # remove all
 ```
+
+**Claude** and **Codex** shorthands:
+
+| | **Claude** | **Codex** |
+|---|---|---|
+| Create | `claude --new-codemob [name]` | `codex --new-codemob [name]` |
+| Resume | `claude --resume-codemob [name]` | `codex --resume-codemob [name]` |
+| Open | `claude --open-codemob [name]` | `codex --open-codemob [name]` |
+
+`[name]` *is optional - omit it and codemob will show an interactive picker.*
 
 ### Inside Claude Code / Codex
 
@@ -173,7 +186,7 @@ codemob purge                    # remove all
 
 `--new-codemob`, `--resume-codemob`, and friends aren't real Claude or Codex flags. They never reach the agent.
 
-【🌕】`codemob init` sources a small shell script into your `.zshrc` that wraps the `claude` and `codex` commands. When you type `claude --new-codemob`, the wrapper intercepts the flag before Claude ever sees it and routes it to `codemob new --agent claude` instead. Any flag it doesn't recognize? Passed straight through to the real `claude` binary, untouched.
+【🌕】`codemob init` sources a small shell script into your shell RC file (`.zshrc`, `.bashrc`, or `.bash_profile`) that wraps the `claude` and `codex` commands. When you type `claude --new-codemob`, the wrapper intercepts the flag before Claude ever sees it and routes it to `codemob new --agent claude` instead. Any flag it doesn't recognize? Passed straight through to the real `claude` binary, untouched.
 
 No patches, no plugins, no monkey-patching. Just a shell function pretending to be `claude` and skimming a few arguments off the top.
 

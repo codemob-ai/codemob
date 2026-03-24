@@ -116,10 +116,9 @@ func CodexPrompts(multipleAgents bool) map[string]string {
 
 const (
 	green  = "\033[38;2;106;191;105m" // #6abf69 — bright green derived from brand #002900
-	yellow = "\033[38;2;231;220;96m"  // #e7dc60 — brand accent
+	accent = "\033[38;2;231;220;96m"  // #e7dc60 — brand accent
 	red    = "\033[38;2;217;83;79m"   // #d9534f — warm red to match brand palette
 	reset  = "\033[0m"
-	accent = "\033[38;2;231;220;96m" // #e7dc60 — brand accent
 
 	ColorRed   = red
 	ColorReset = reset
@@ -148,7 +147,7 @@ func PrintBanner(color string) {
 }
 
 func info(msg string)   { fmt.Printf("%s✓ %s%s\n", green, msg, reset) }
-func warn(msg string)   { fmt.Printf("%s! %s%s\n", yellow, msg, reset) }
+func warn(msg string)   { fmt.Printf("%s! %s%s\n", accent, msg, reset) }
 func errMsg(msg string) { fmt.Printf("%s✗ %s%s\n", red, msg, reset) }
 
 // Init performs the full codemob initialization.
@@ -158,7 +157,26 @@ func Init(installDir string, forceReprompt bool) error {
 	fmt.Println("codemob init")
 	fmt.Println("────────────")
 	fmt.Println()
+	warn("This will:")
+	fmt.Println("  - Add shell integration (mob alias, claude/codex wrappers) to your shell RC file")
+	fmt.Println("  - Add codemob entries to global gitignore")
+	fmt.Println("  - Add codemob permissions to Claude settings (if installed)")
+	fmt.Println("  - Initialize .codemob/ config in the current repo")
+	fmt.Println("  - Install slash commands for your AI agents")
+	fmt.Println()
+	fmt.Printf("  All of this can be easily reverted with: %scodemob uninstall%s\n", green, reset)
+	fmt.Println()
+	fmt.Print("Continue? [Y/n]: ")
 
+	reader := bufio.NewReader(os.Stdin)
+	input, _ := reader.ReadString('\n')
+	input = strings.TrimSpace(strings.ToLower(input))
+	if input == "n" || input == "no" {
+		fmt.Println("Cancelled.")
+		return nil
+	}
+
+	fmt.Println()
 	fmt.Println("Global setup:")
 	claude, codex, err := checkDependencies()
 	if err != nil {
@@ -181,7 +199,7 @@ func Init(installDir string, forceReprompt bool) error {
 		setupCodexPrompts(bothReady)
 	}
 
-	rcFile, rcName := detectShellRC()
+	_, rcName := detectShellRC()
 	fmt.Println()
 	fmt.Println("────────────────────────────────────────────────────────")
 	warn("codemob won't work until you reload your shell!")
@@ -189,13 +207,11 @@ func Init(installDir string, forceReprompt bool) error {
 	fmt.Println("  Either open a new terminal, or run:")
 	fmt.Printf("  source %s\n", rcName)
 	fmt.Println("────────────────────────────────────────────────────────")
-	_ = rcFile
 	return nil
 }
 
 type agentStatus struct {
-	installed     bool
-	authenticated bool
+	installed bool
 }
 
 // checkDependencies checks git and agent availability. Returns per-agent status.
@@ -237,39 +253,36 @@ func checkAgent(name, installHint string) agentStatus {
 	}
 	info(fmt.Sprintf("%s found (%s)", name, version))
 
-	auth := checkAgentAuth(name)
-	return agentStatus{installed: true, authenticated: auth}
+	checkAgentAuth(name)
+	return agentStatus{installed: true}
 }
 
 // checkAgentAuth is a best-effort auth check. Never blocks init.
-func checkAgentAuth(name string) bool {
+func checkAgentAuth(name string) {
 	switch name {
 	case "claude":
 		out, err := exec.Command("claude", "auth", "status", "--json").Output()
 		if err != nil {
 			warn(fmt.Sprintf("Could not verify %s auth — unauthenticated agents may not work as expected", name))
-			return false
+			return
 		}
 		var result struct {
 			LoggedIn bool `json:"loggedIn"`
 		}
 		if err := json.Unmarshal(out, &result); err != nil || !result.LoggedIn {
 			errMsg(fmt.Sprintf("%s is not authenticated — run: claude auth login", name))
-			return false
+			return
 		}
 		info(fmt.Sprintf("%s authenticated", name))
-		return true
 
 	case "codex":
 		// Exit code 0 = logged in, non-zero = not logged in or command failed
 		if err := exec.Command("codex", "login", "status").Run(); err != nil {
 			errMsg(fmt.Sprintf("%s is not authenticated — run: codex login", name))
-			return false
+			return
 		}
 		info(fmt.Sprintf("%s authenticated", name))
-		return true
 	}
-	return false
 }
 
 func setupGlobalGitignore() {
@@ -392,12 +405,6 @@ var codemobPermissions = []string{
 }
 
 func setupClaudePermissions() {
-	defer func() {
-		if r := recover(); r != nil {
-			warn(fmt.Sprintf("Could not configure Claude permissions: %v", r))
-		}
-	}()
-
 	settingsPath := filepath.Join(os.Getenv("HOME"), ".claude", "settings.json")
 
 	// Read existing settings or start fresh
@@ -464,12 +471,6 @@ func setupClaudePermissions() {
 }
 
 func removeClaudePermissions() {
-	defer func() {
-		if r := recover(); r != nil {
-			warn(fmt.Sprintf("Could not clean up Claude permissions: %v", r))
-		}
-	}()
-
 	settingsPath := filepath.Join(os.Getenv("HOME"), ".claude", "settings.json")
 
 	data, err := os.ReadFile(settingsPath)
@@ -684,7 +685,7 @@ func Uninstall(installDir string) error {
 			for _, m := range cfg.Mobs {
 				worktreePath := filepath.Join(repoRoot, MobsDir, m.Name)
 				_ = gitutil.WorktreeRemove(repoRoot, worktreePath, true)
-				_ = gitutil.BranchDelete(repoRoot, m.Branch)
+				gitutil.BranchDelete(repoRoot, m.Branch)
 			}
 		}
 		// Remove .codemob/ directory
