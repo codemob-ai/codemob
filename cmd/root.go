@@ -491,7 +491,11 @@ func cmdRemove(args []string) error {
 	}
 
 	if name == "" {
-		return fmt.Errorf("mob name required")
+		picked, err := pickMob(cfg, pickerOpts{})
+		if err != nil {
+			return err
+		}
+		name = picked
 	}
 
 	m := resolveMob(cfg, name)
