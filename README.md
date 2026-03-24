@@ -29,7 +29,7 @@ Other terminal-based agents work too - `codemob cd` drops you into the workspace
 Start a new session - codemob creates an isolated workspace and drops you into your agent:
 
 ```bash
-❯ claude --new-mob
+❯ claude --new-codemob
 
   ● codemob  Created mob 'wild-kumquat' on branch mob/wild-kumquat
 
@@ -132,17 +132,15 @@ codemob init
 
 ## Usage
 
-`codemob` and `mob` are interchangeable - use whichever you prefer.
-
 ```bash
 # start
 codemob new                      # auto-generated name, default agent
 codemob new brave-mango          # named mob
 codemob new --agent codex        # pick agent
-claude --new-mob                 # shorthand, launches claude
-claude --new-mob brave-mango     # shorthand with name
-claude --mob                     # even shorter
-codex --new-mob                  # shorthand, launches codex
+claude --new-codemob             # shorthand, launches claude
+claude --new-codemob brave-mango # shorthand with name
+claude --codemob                 # even shorter
+codex --new-codemob              # shorthand, launches codex
 
 # manage
 codemob list                     # list mobs (with indices)
@@ -162,14 +160,14 @@ codemob purge                    # remove all
 | `/codemob-change-agent` | Swap agent (claude <-> codex) |
 | `/codemob-remove` | Remove mob |
 
-> [!NOTE]
-> Also available as `/mob-*`.
+> [!IMPORTANT]
+> `codemob` and `mob` are interchangeable everywhere - commands, flags, slash commands. So `--new-codemob` works as `--new-mob`, `/codemob-new` works as `/mob-new`, etc.
 
 ## How the agent flags work (they don't)
 
-`--new-mob`, `--resume-mob`, and friends aren't real Claude or Codex flags. They never reach the agent.
+`--new-codemob`, `--resume-codemob`, and friends aren't real Claude or Codex flags. They never reach the agent.
 
-【🌕】`codemob init` sources a small shell script into your `.zshrc` that wraps the `claude` and `codex` commands. When you type `claude --new-mob`, the wrapper intercepts the flag before Claude ever sees it and routes it to `codemob new --agent claude` instead. Any flag it doesn't recognize? Passed straight through to the real `claude` binary, untouched.
+【🌕】`codemob init` sources a small shell script into your `.zshrc` that wraps the `claude` and `codex` commands. When you type `claude --new-codemob`, the wrapper intercepts the flag before Claude ever sees it and routes it to `codemob new --agent claude` instead. Any flag it doesn't recognize? Passed straight through to the real `claude` binary, untouched.
 
 No patches, no plugins, no monkey-patching. Just a shell function pretending to be `claude` and skimming a few arguments off the top.
 
