@@ -28,12 +28,17 @@ Two layers:
 Commands:
 ```
 codemob new [name]          # create mob + launch agent
-codemob resume [name]       # resume a mob (launch agent in worktree)
+codemob resume [name]       # resume a mob (continue previous session)
+codemob open [name]         # open a mob (fresh agent session)
 codemob list                # list all mobs
+codemob path [name]         # print worktree path (interactive if no name)
+codemob cd <name>           # cd into a mob's worktree (shell function)
+codemob cd root             # cd back to repo root
 codemob init                # first-time setup (global + repo)
 codemob reinit              # alias for init (idempotent)
 codemob remove <name>       # remove a mob (accepts name or index)
 codemob purge               # remove all mobs (with confirmation)
+codemob info                # show diagnostic information
 codemob uninstall           # remove all codemob setup (global + local)
 ```
 
@@ -50,8 +55,10 @@ Claude/Codex wrappers (installed by init):
 claude --mob [name]         # → codemob new --agent claude [name]
 claude --new-mob [name]     # same as --mob
 claude --resume-mob <name>  # → codemob resume <name>
+claude --open-mob <name>    # → codemob open --agent claude <name>
 codex --mob [name]          # → codemob new --agent codex [name]
 codex --resume-mob <name>   # → codemob resume <name>
+codex --open-mob <name>     # → codemob open --agent codex <name>
 ```
 
 ## Build

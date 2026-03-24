@@ -31,6 +31,7 @@ claude() {
   case "${1:-}" in
     --mob|--codemob|--new-mob|--new-codemob) shift; codemob new --agent claude "$@"; return $? ;;
     --resume-mob|--resume-codemob)       shift; codemob resume "$@"; return $? ;;
+    --open-mob|--open-codemob)           shift; codemob open --agent claude "$@"; return $? ;;
     --switch-mob|--switch-codemob)       shift; codemob switch "$@"; return $? ;;
     --list-mob|--list-mobs|--list-codemob|--list-codemobs) shift; codemob list "$@"; return $? ;;
     *)
@@ -46,6 +47,7 @@ codex() {
   case "${1:-}" in
     --mob|--codemob|--new-mob|--new-codemob) shift; codemob new --agent codex "$@"; return $? ;;
     --resume-mob|--resume-codemob)       shift; codemob resume "$@"; return $? ;;
+    --open-mob|--open-codemob)           shift; codemob open --agent codex "$@"; return $? ;;
     --switch-mob|--switch-codemob)       shift; codemob switch "$@"; return $? ;;
     --list-mob|--list-mobs|--list-codemob|--list-codemobs) shift; codemob list "$@"; return $? ;;
     *)

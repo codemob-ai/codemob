@@ -946,6 +946,52 @@ func TestNewMobWithCustomAgent(t *testing.T) {
 	}
 }
 
+// ─── Open ────────────────────────────────────────────────────────────────────
+
+func TestOpenRejectsUnknownFlags(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "open-test", "--no-launch")
+
+	// when
+	out := runCoreExpectError(t, bin, repoPath, "open", "--typo")
+
+	// then
+	if !strings.Contains(out, "unknown flag") {
+		t.Errorf("expected 'unknown flag' error, got: %s", out)
+	}
+}
+
+func TestOpenNotFound(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "exists", "--no-launch")
+
+	// when
+	out := runCoreExpectError(t, bin, repoPath, "open", "nonexistent")
+
+	// then
+	if !strings.Contains(out, "not found") {
+		t.Errorf("expected 'not found' error, got: %s", out)
+	}
+}
+
+func TestOpenNoMobs(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	// when
+	out := runCoreExpectError(t, bin, repoPath, "open", "anything")
+
+	// then
+	if !strings.Contains(out, "not found") {
+		t.Errorf("expected 'not found' error, got: %s", out)
+	}
+}
+
 // ─── Path ────────────────────────────────────────────────────────────────────
 
 func TestPathByName(t *testing.T) {

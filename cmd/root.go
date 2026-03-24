@@ -126,14 +126,64 @@ func cmdUninstall(_ []string) error {
 
 // resolveMob finds a mob by name or 1-based index.
 func resolveMob(cfg *mob.Config, nameOrIndex string) *mob.Mob {
-	// Try as index first
 	if idx, err := strconv.Atoi(nameOrIndex); err == nil {
 		if idx >= 1 && idx <= len(cfg.Mobs) {
 			return &cfg.Mobs[idx-1]
 		}
 	}
-	// Fall back to name
 	return mob.FindMob(cfg, nameOrIndex)
+}
+
+type pickerOpts struct {
+	out        *os.File // output for table and prompt (default: os.Stdout)
+	markerName string   // mob name to mark with ◀ (e.g., last session mob)
+	defaultVal string   // pre-filled default shown in prompt bracket; enter selects it
+	showRoot   bool     // show "0 — repo root" hint (for cd/path)
+}
+
+func pickMob(cfg *mob.Config, opts pickerOpts) (string, error) {
+	if len(cfg.Mobs) == 0 {
+		return "", fmt.Errorf("no mobs. Create one with: codemob new")
+	}
+	if len(cfg.Mobs) == 1 && opts.defaultVal == "" && !opts.showRoot {
+		return cfg.Mobs[0].Name, nil
+	}
+
+	out := opts.out
+	if out == nil {
+		out = os.Stdout
+	}
+
+	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "#\tNAME\tBRANCH\tLAST AGENT\tCREATED")
+	for i, m := range cfg.Mobs {
+		marker := ""
+		if m.Name == opts.markerName {
+			marker = " ◀"
+		}
+		fmt.Fprintf(w, "%d\t%s%s\t%s\t%s\t%s\n", i+1, m.Name, marker, m.Branch, m.Agent, mob.RelativeTime(m.CreatedAt))
+	}
+	w.Flush()
+
+	if opts.showRoot {
+		fmt.Fprintf(out, "\n  \033[38;2;100;180;220m> enter 0 to cd back to repo root\033[0m\n")
+	}
+
+	if opts.defaultVal != "" {
+		fmt.Fprintf(out, "\nWhich mob? (#/name) [%s]: ", opts.defaultVal)
+	} else {
+		fmt.Fprint(out, "\nWhich mob? (#/name): ")
+	}
+
+	var name string
+	fmt.Scanln(&name)
+	if name == "" {
+		name = opts.defaultVal
+	}
+	if name == "" {
+		return "", fmt.Errorf("no mob selected")
+	}
+	return name, nil
 }
 
 func cmdInit(_ []string, forceReprompt bool) error {
@@ -290,36 +340,17 @@ func cmdResume(args []string) error {
 	}
 
 	if name == "" {
-		if len(cfg.Mobs) == 0 {
-			return fmt.Errorf("no mobs. Create one with: codemob new")
+		lastMob := readLastMob(root)
+		if lastMob != "" && mob.FindMob(cfg, lastMob) == nil {
+			lastMob = ""
 		}
-		if len(cfg.Mobs) == 1 {
-			name = cfg.Mobs[0].Name
-		} else {
-			lastMob := readLastMob(root)
-			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-			fmt.Fprintln(w, "#\tNAME\tBRANCH\tLAST AGENT\tCREATED")
-			for i, m := range cfg.Mobs {
-				marker := ""
-				if m.Name == lastMob {
-					marker = " ◀"
-				}
-				fmt.Fprintf(w, "%d\t%s%s\t%s\t%s\t%s\n", i+1, m.Name, marker, m.Branch, m.Agent, mob.RelativeTime(m.CreatedAt))
-			}
-			w.Flush()
-			if lastMob != "" && mob.FindMob(cfg, lastMob) != nil {
-				fmt.Printf("\nWhich mob? (#/name) [%s]: ", lastMob)
-			} else {
-				fmt.Print("\nWhich mob? (#/name): ")
-				lastMob = ""
-			}
-			fmt.Scanln(&name)
-			if name == "" {
-				name = lastMob
-			}
-		}
-		if name == "" {
-			return fmt.Errorf("no mob selected")
+		var err error
+		name, err = pickMob(cfg, pickerOpts{
+			markerName: lastMob,
+			defaultVal: lastMob,
+		})
+		if err != nil {
+			return err
 		}
 	}
 
@@ -347,13 +378,15 @@ func cmdOpen(args []string) error {
 	name := ""
 	agent := ""
 	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--agent":
+		switch {
+		case args[i] == "--agent":
 			if i+1 >= len(args) {
 				return fmt.Errorf("--agent requires a value (e.g., --agent codex)")
 			}
 			agent = args[i+1]
 			i++
+		case strings.HasPrefix(args[i], "--"):
+			return fmt.Errorf("unknown flag for open: %s", args[i])
 		default:
 			if name == "" {
 				name = args[i]
@@ -362,23 +395,10 @@ func cmdOpen(args []string) error {
 	}
 
 	if name == "" {
-		if len(cfg.Mobs) == 0 {
-			return fmt.Errorf("no mobs. Create one with: codemob new")
-		}
-		if len(cfg.Mobs) == 1 {
-			name = cfg.Mobs[0].Name
-		} else {
-			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-			fmt.Fprintln(w, "#\tNAME\tBRANCH\tLAST AGENT\tCREATED")
-			for i, m := range cfg.Mobs {
-				fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", i+1, m.Name, m.Branch, m.Agent, mob.RelativeTime(m.CreatedAt))
-			}
-			w.Flush()
-			fmt.Print("\nWhich mob? (#/name): ")
-			fmt.Scanln(&name)
-		}
-		if name == "" {
-			return fmt.Errorf("no mob selected")
+		var err error
+		name, err = pickMob(cfg, pickerOpts{})
+		if err != nil {
+			return err
 		}
 	}
 
@@ -546,29 +566,15 @@ func cmdPath(args []string) error {
 		return nil
 	}
 
-	if len(cfg.Mobs) == 0 {
-		return fmt.Errorf("no mobs. Create one with: codemob new")
-	}
-
 	if name == "" {
-		if len(cfg.Mobs) == 1 && mob.CurrentMobName() == "" {
-			name = cfg.Mobs[0].Name
-		} else {
-			inMob := mob.CurrentMobName() != ""
-			w := tabwriter.NewWriter(os.Stderr, 0, 0, 2, ' ', 0)
-			fmt.Fprintln(w, "#\tNAME\tBRANCH\tLAST AGENT\tCREATED")
-			for i, m := range cfg.Mobs {
-				fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", i+1, m.Name, m.Branch, m.Agent, mob.RelativeTime(m.CreatedAt))
-			}
-			w.Flush()
-			if inMob {
-				fmt.Fprintf(os.Stderr, "\n  \033[38;2;100;180;220m> enter 0 to cd back to repo root\033[0m\n")
-			}
-			fmt.Fprint(os.Stderr, "\nWhich mob? (#/name): ")
-			fmt.Scanln(&name)
-		}
-		if name == "" {
-			return fmt.Errorf("no mob selected")
+		inMob := mob.CurrentMobName() != ""
+		var err error
+		name, err = pickMob(cfg, pickerOpts{
+			out:      os.Stderr,
+			showRoot: inMob,
+		})
+		if err != nil {
+			return err
 		}
 	}
 
