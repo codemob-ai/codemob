@@ -458,6 +458,9 @@ func cmdOpen(args []string) error {
 
 	if agent == "" {
 		agent = m.Agent
+	} else if agent != m.Agent {
+		m.Agent = agent
+		_ = mob.SaveConfig(root, cfg)
 	}
 
 	worktreePath := filepath.Join(root, mob.MobsDir, m.Name)
