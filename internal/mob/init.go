@@ -638,18 +638,12 @@ func setupRepo(reprompt bool) string {
 	enclosingPath := filepath.Join(filepath.Dir(root), ".codemob", repoName, "mobs")
 	globalPath := filepath.Join(home, ".codemob", repoName, "mobs")
 
-	hasCustomPath := cfg.MobsDirPath != "" && cfg.MobsDirPath != enclosingPath && cfg.MobsDirPath != globalPath
-
 	currentDefault := "1"
 	switch cfg.MobsDirPath {
 	case enclosingPath:
 		currentDefault = "2"
 	case globalPath:
 		currentDefault = "3"
-	case "":
-		currentDefault = "1"
-	default:
-		currentDefault = "4"
 	}
 
 	fmt.Println()
@@ -657,9 +651,6 @@ func setupRepo(reprompt bool) string {
 	fmt.Printf("  1) Project dir    %s/\n", filepath.Join(root, MobsDir))
 	fmt.Printf("  2) Enclosing dir  %s/\n", enclosingPath)
 	fmt.Printf("  3) Global dir     %s/\n", globalPath)
-	if hasCustomPath {
-		fmt.Printf("  4) Current        %s/\n", cfg.MobsDirPath)
-	}
 	fmt.Printf("\nMobs directory [%s]: ", currentDefault)
 	input, _ = reader.ReadString('\n')
 	choice := strings.TrimSpace(input)
@@ -673,8 +664,6 @@ func setupRepo(reprompt bool) string {
 		cfg.MobsDirPath = enclosingPath
 	case "3":
 		cfg.MobsDirPath = globalPath
-	case "4":
-		// keep current custom path
 	default:
 		cfg.MobsDirPath = ""
 	}
