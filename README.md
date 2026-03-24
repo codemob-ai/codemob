@@ -138,23 +138,27 @@ codemob init
 > `codemob new` = `mob new`, `claude --new-codemob` = `claude --new-mob`, `/codemob-new` = `/mob-new`
 
 ```bash
-# start
+# create
 codemob new                      # auto-generated name, default agent
 codemob new brave-mango          # named mob
 codemob new --agent codex        # pick agent
 claude --new-codemob             # shorthand, launches claude
-claude --new-codemob brave-mango # shorthand with name
 claude --codemob                 # even shorter
-claude --open-codemob brave-mango # fresh session (no continue)
 codex --new-codemob              # shorthand, launches codex
+
+# resume / open
+codemob resume brave-mango       # continue previous session
+codemob open brave-mango         # fresh agent session
+claude --resume-codemob brave-mango  # shorthand
+claude --open-codemob brave-mango    # shorthand
+
+# navigate
+codemob cd brave-mango           # cd into a mob's worktree
+codemob cd root                  # cd back to the main repo
 
 # manage
 codemob list                     # list mobs (with indices)
-codemob resume brave-mango       # resume by name (continues session)
 codemob resume 2                 # resume by index
-codemob open brave-mango         # open with a fresh agent session
-codemob cd brave-mango           # cd into a mob's worktree
-codemob cd root                  # cd back to the main repo
 codemob remove brave-mango       # remove one
 codemob purge                    # remove all
 ```
