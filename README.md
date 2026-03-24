@@ -142,15 +142,10 @@ codemob init
 codemob new                      # auto-generated name, default agent
 codemob new brave-mango          # named mob
 codemob new --agent codex        # pick agent
-claude --new-codemob             # shorthand, launches claude
-claude --codemob                 # even shorter
-codex --new-codemob              # shorthand, launches codex
 
 # resume / open
 codemob resume brave-mango       # continue previous session
 codemob open brave-mango         # fresh agent session
-claude --resume-codemob brave-mango  # shorthand
-claude --open-codemob brave-mango    # shorthand
 
 # navigate
 codemob cd brave-mango           # cd into a mob's worktree
@@ -162,6 +157,14 @@ codemob resume 2                 # resume by index
 codemob remove brave-mango       # remove one
 codemob purge                    # remove all
 ```
+
+**Claude** and **Codex** shorthands:
+
+| | **Claude** | **Codex** |
+|---|---|---|
+| Create | `claude --new-codemob` | `codex --new-codemob` |
+| Resume | `claude --resume-codemob <name>` | `codex --resume-codemob <name>` |
+| Open | `claude --open-codemob <name>` | `codex --open-codemob <name>` |
 
 ### Inside Claude Code / Codex
 
