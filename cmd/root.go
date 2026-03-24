@@ -71,6 +71,19 @@ func Execute() error {
 	cmd := os.Args[1]
 	args := os.Args[2:]
 
+	// Check for version upgrade on user-facing commands
+	switch cmd {
+	case "switch", "list-others", "check-queue", "queue", "inject-args",
+		"init", "reinit", "uninstall", "version", "--version", "-v", "help", "--help", "-h":
+		// skip upgrade check
+	default:
+		repoRoot := ""
+		if root, err := mob.FindRepoRoot(); err == nil {
+			repoRoot = root
+		}
+		mob.CheckUpgrade(Version, repoRoot)
+	}
+
 	switch cmd {
 	// Commands
 	case "new":
@@ -196,7 +209,11 @@ func cmdInit(_ []string, forceReprompt bool) error {
 		return fmt.Errorf("could not determine install directory: %w", err)
 	}
 	installDir := filepath.Dir(exe)
-	return mob.Init(installDir, forceReprompt)
+	if err := mob.Init(installDir, forceReprompt); err != nil {
+		return err
+	}
+	mob.WriteVersion(Version)
+	return nil
 }
 
 func requireInit() (string, *mob.Config, error) {
