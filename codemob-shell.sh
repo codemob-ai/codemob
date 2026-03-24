@@ -35,7 +35,11 @@ claude() {
     --switch-mob|--switch-codemob)       shift; codemob switch "$@"; return $? ;;
     --list-mob|--list-mobs|--list-codemob|--list-codemobs) shift; codemob list "$@"; return $? ;;
     *)
-      command claude "$@"
+      local extra_args=()
+      while IFS= read -r line; do
+        extra_args+=("$line")
+      done < <(command codemob inject-args claude 2>/dev/null)
+      command claude "${extra_args[@]}" "$@"
       local ec=$?
       codemob check-queue 2>/dev/null
       return $ec
@@ -51,7 +55,11 @@ codex() {
     --switch-mob|--switch-codemob)       shift; codemob switch "$@"; return $? ;;
     --list-mob|--list-mobs|--list-codemob|--list-codemobs) shift; codemob list "$@"; return $? ;;
     *)
-      command codex "$@"
+      local extra_args=()
+      while IFS= read -r line; do
+        extra_args+=("$line")
+      done < <(command codemob inject-args codex 2>/dev/null)
+      command codex "${extra_args[@]}" "$@"
       local ec=$?
       codemob check-queue 2>/dev/null
       return $ec

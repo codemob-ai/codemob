@@ -30,7 +30,15 @@ func WorktreeList(repoRoot string) ([]WorktreeInfo, error) {
 	return parseWorktreeList(out), nil
 }
 
+func HasCommits(repoRoot string) bool {
+	_, err := runGit(repoRoot, "rev-parse", "HEAD")
+	return err == nil
+}
+
 func WorktreeAdd(repoRoot, path, branch, base string) error {
+	if !HasCommits(repoRoot) {
+		return fmt.Errorf("repo has no commits yet - create at least one commit before using codemob")
+	}
 	_, err := runGit(repoRoot, "worktree", "add", "-b", branch, path, base)
 	if err != nil {
 		return fmt.Errorf("failed to create worktree: %w", err)

@@ -71,6 +71,19 @@ func Execute() error {
 	cmd := os.Args[1]
 	args := os.Args[2:]
 
+	// Check for version upgrade on user-facing commands
+	switch cmd {
+	case "switch", "list-others", "check-queue", "queue", "inject-args",
+		"init", "reinit", "uninstall", "version", "--version", "-v", "help", "--help", "-h":
+		// skip upgrade check
+	default:
+		repoRoot := ""
+		if root, err := mob.FindRepoRoot(); err == nil {
+			repoRoot = root
+		}
+		mob.CheckUpgrade(Version, repoRoot)
+	}
+
 	switch cmd {
 	// Commands
 	case "new":
@@ -105,6 +118,8 @@ func Execute() error {
 		return cmdCheckNext(args)
 	case "queue":
 		return cmdWriteNext(args)
+	case "inject-args":
+		return cmdInjectArgs(args)
 
 	case "version", "--version", "-v":
 		fmt.Printf("codemob %s\n", Version)
@@ -194,7 +209,11 @@ func cmdInit(_ []string, forceReprompt bool) error {
 		return fmt.Errorf("could not determine install directory: %w", err)
 	}
 	installDir := filepath.Dir(exe)
-	return mob.Init(installDir, forceReprompt)
+	if err := mob.Init(installDir, forceReprompt); err != nil {
+		return err
+	}
+	mob.WriteVersion(Version)
+	return nil
 }
 
 func requireInit() (string, *mob.Config, error) {
@@ -867,18 +886,48 @@ func runAgent(root, agent, workdir string, resume bool) error {
 	return spawnAgent(binPath, newArgs, workdir)
 }
 
-func agentArgs(agent, repoRoot string) (binPath string, resumeArgs, newArgs []string, err error) {
-	worktreeHint := "IMPORTANT: You are working inside a codemob worktree. " +
+func cmdInjectArgs(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: codemob inject-args <agent>")
+	}
+	agent := args[0]
+
+	repoRoot := mob.InsideWorktree()
+	if repoRoot == "" {
+		return nil
+	}
+
+	hint := worktreeHint(repoRoot)
+
+	switch agent {
+	case "claude":
+		fmt.Println("--add-dir")
+		fmt.Println(repoRoot)
+		fmt.Println("--append-system-prompt")
+		fmt.Println(hint)
+	case "codex":
+		fmt.Println("--add-dir")
+		fmt.Println(repoRoot)
+	}
+	return nil
+}
+
+func worktreeHint(repoRoot string) string {
+	return "IMPORTANT: You are working inside a codemob worktree. " +
 		"This IS a full git repository — all files and history are available here. " +
 		"Use your current working directory as the project root. " +
 		"Do NOT navigate to " + repoRoot + " — that is the main repo and may be on a different branch with different files. " +
 		"When spawning subagents (Explore, Agent, etc.), instruct them to work in the current directory, not " + repoRoot + "."
+}
+
+func agentArgs(agent, repoRoot string) (binPath string, resumeArgs, newArgs []string, err error) {
+	hint := worktreeHint(repoRoot)
 
 	switch agent {
 	case "claude":
 		binPath, err = exec.LookPath("claude")
-		resumeArgs = []string{"--continue", "--add-dir", repoRoot, "--append-system-prompt", worktreeHint}
-		newArgs = []string{"--add-dir", repoRoot, "--append-system-prompt", worktreeHint}
+		resumeArgs = []string{"--continue", "--add-dir", repoRoot, "--append-system-prompt", hint}
+		newArgs = []string{"--add-dir", repoRoot, "--append-system-prompt", hint}
 	case "codex":
 		binPath, err = exec.LookPath("codex")
 		resumeArgs = []string{"resume", "--last", "--add-dir", repoRoot}

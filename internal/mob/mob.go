@@ -32,17 +32,23 @@ type Config struct {
 
 // FindRepoRoot finds the main repo root, accounting for being inside a mob worktree.
 func FindRepoRoot() (string, error) {
+	if root := InsideWorktree(); root != "" {
+		return root, nil
+	}
+	return gitutil.RepoRoot()
+}
+
+// InsideWorktree returns the repo root if the current directory is inside a
+// codemob worktree, or empty string if not.
+func InsideWorktree() string {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return "", err
+		return ""
 	}
-
-	// Check if we're inside a mob worktree
 	if idx := strings.Index(cwd, "/"+MobsDir+"/"); idx != -1 {
-		return cwd[:idx], nil
+		return cwd[:idx]
 	}
-
-	return gitutil.RepoRoot()
+	return ""
 }
 
 // IsInitialized checks if codemob is initialized in the given repo.

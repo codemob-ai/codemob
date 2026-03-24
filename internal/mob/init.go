@@ -17,14 +17,19 @@ type commandDef struct {
 	Body        string // instructions for the agent
 }
 
+const triggerGuard = "IMPORTANT: Only invoke this command when the user explicitly mentions " +
+	"\"mob\" or \"codemob\". Generic requests like \"list\", \"create\", " +
+	"\"remove\", or \"switch\" without mentioning mob/codemob should NOT trigger this.\n\n"
+
 var slashCommandDefs = map[string]commandDef{
 	"list": {
 		Description: "List all codemob workspaces and their status",
-		Body:        "Run exactly this command using the Bash tool: codemob list\n\nDo NOT use go run, do NOT cd anywhere. Just run: codemob list\n\nDisplay the output to the user.\n",
+		Body: triggerGuard +
+			"Run exactly this command using the Bash tool: codemob list\n\nDo NOT use go run, do NOT cd anywhere. Just run: codemob list\n\nDisplay the output to the user.\n",
 	},
 	"new": {
 		Description: "Create a new codemob workspace",
-		Body: `Ask the user if they want to provide a name or have one auto-generated.
+		Body: triggerGuard + `Ask the user if they want to provide a name or have one auto-generated.
 
 If they provide a name, run: ` + "`codemob queue new <name>`" + ` (replace ` + "`<name>`" + ` with their choice).
 If they want auto-generated, run: ` + "`codemob queue new`" + ` (no name argument — codemob generates one).
@@ -36,7 +41,7 @@ Then tell the user: "New mob queued. Exit this session (Ctrl+C) and codemob will
 	},
 	"switch": {
 		Description: "Switch to a different codemob workspace",
-		Body: `Run ` + "`codemob list-others`" + ` using the Bash tool.
+		Body: triggerGuard + `Run ` + "`codemob list-others`" + ` using the Bash tool.
 
 If the output says "No mobs", tell the user there are no other mobs to switch to and suggest using /mob-new or /codemob-new to create one.
 
@@ -49,7 +54,7 @@ Then tell the user: "Switch queued. Exit this session (Ctrl+C) and codemob will 
 	},
 	"change-agent": {
 		Description: "Switch the current mob to a different AI agent",
-		Body: `codemob supports claude and codex out of the box.
+		Body: triggerGuard + `codemob supports claude and codex out of the box.
 
 Determine the current agent by checking which tool you are (claude or codex). Offer the OTHER agent — do not suggest the one already running.
 
@@ -60,7 +65,7 @@ Then tell the user: "Agent switch queued. Exit this session (Ctrl+C) and codemob
 	},
 	"remove": {
 		Description: "Remove a codemob workspace",
-		Body: `Run ` + "`codemob list`" + ` using the Bash tool and display the results.
+		Body: triggerGuard + `Run ` + "`codemob list`" + ` using the Bash tool and display the results.
 
 Determine the current mob by checking if the working directory contains ` + "`.codemob/mobs/`" + ` — if so, extract the mob name from the path.
 
@@ -73,7 +78,7 @@ If they choose the CURRENT mob, run ` + "`codemob queue remove <name>`" + ` and 
 	},
 	"drop": {
 		Description: "Remove the current codemob workspace and exit",
-		Body: `Determine the current mob by checking if the working directory contains ` + "`.codemob/mobs/`" + ` — if so, extract the mob name from the path.
+		Body: triggerGuard + `Determine the current mob by checking if the working directory contains ` + "`.codemob/mobs/`" + ` — if so, extract the mob name from the path.
 
 If you are NOT inside a codemob worktree, tell the user: "This command can only be used from within a codemob workspace." and stop.
 
@@ -741,6 +746,9 @@ func Uninstall(installDir string) error {
 	} else {
 		info("No Codex prompts to clean up")
 	}
+
+	// Remove global version file
+	os.Remove(globalVersionFile())
 
 	fmt.Println()
 	info("Uninstalled. Open a new terminal for changes to take effect.")
