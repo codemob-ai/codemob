@@ -13,20 +13,20 @@ _Powered by git worktrees under the hood, but you don't need to know that._
 
 【🌗】`claude --worktree` solves it. Kind of... Creates an isolated worktree, launches a session, offers to clean up when you're done. Until you decide not to clean up, because you want to come back to it later. Then it's just a directory somewhere that you need to track down, `cd` into, and relaunch the agent in manually.
 
-【🌕】`codemob` manages the full lifecycle -_create_, _resume_, _list_, _switch_, _clean up_.
+【🌕】`codemob` manages the full lifecycle - _create_, _resume_, _list_, _switch_, _clean up_.
 
 <details>
 <summary>Supported agents</summary>
 <br>
 
 **Claude** (primary focus) and **Codex** supported out of the box.
-Other terminal-based agents work too -`codemob cd` drops you into the workspace.
+Other terminal-based agents work too - `codemob cd` drops you into the workspace.
 
 </details>
 
 ## 【🌕】How
 
-Start a new session -codemob creates an isolated workspace and drops you into your agent:
+Start a new session - codemob creates an isolated workspace and drops you into your agent:
 
 ```bash
 ❯ claude --new-mob
@@ -64,7 +64,7 @@ Need another session? Create one without leaving Claude:
   ▘▘ ▝▝    ~/my-project/.codemob/mobs/epic-apricot
 ```
 
-Switch between sessions -`/mob-switch`, pick one, exit, done:
+Switch between sessions - `/mob-switch`, pick one, exit, done:
 
 ```bash
  ▐▛███▜▌   Claude Code
@@ -92,7 +92,7 @@ Switch between sessions -`/mob-switch`, pick one, exit, done:
   ▘▘ ▝▝    ~/my-project/.codemob/mobs/wild-kumquat
 ```
 
-Swap the agent on the fly -go from Claude to Codex (or back) on the same workspace:
+Swap the agent on the fly - go from Claude to Codex (or back) on the same workspace:
 
 ```bash
  ▐▛███▜▌   Claude Code
@@ -132,7 +132,7 @@ codemob init
 
 ## Usage
 
-`codemob` and `mob` are interchangeable -use whichever you prefer.
+`codemob` and `mob` are interchangeable - use whichever you prefer.
 
 ```bash
 # start
