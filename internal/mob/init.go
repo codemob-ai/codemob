@@ -180,7 +180,7 @@ func Init(installDir string, forceReprompt bool) error {
 		setupCodexPrompts(bothReady)
 	}
 
-	rcFile, rcName := detectShellRC()
+	_, rcName := detectShellRC()
 	fmt.Println()
 	fmt.Println("────────────────────────────────────────────────────────")
 	warn("codemob won't work until you reload your shell!")
@@ -188,7 +188,6 @@ func Init(installDir string, forceReprompt bool) error {
 	fmt.Println("  Either open a new terminal, or run:")
 	fmt.Printf("  source %s\n", rcName)
 	fmt.Println("────────────────────────────────────────────────────────")
-	_ = rcFile
 	return nil
 }
 
@@ -240,34 +239,31 @@ func checkAgent(name, installHint string) agentStatus {
 }
 
 // checkAgentAuth is a best-effort auth check. Never blocks init.
-func checkAgentAuth(name string) bool {
+func checkAgentAuth(name string) {
 	switch name {
 	case "claude":
 		out, err := exec.Command("claude", "auth", "status", "--json").Output()
 		if err != nil {
 			warn(fmt.Sprintf("Could not verify %s auth — unauthenticated agents may not work as expected", name))
-			return false
+			return
 		}
 		var result struct {
 			LoggedIn bool `json:"loggedIn"`
 		}
 		if err := json.Unmarshal(out, &result); err != nil || !result.LoggedIn {
 			errMsg(fmt.Sprintf("%s is not authenticated — run: claude auth login", name))
-			return false
+			return
 		}
 		info(fmt.Sprintf("%s authenticated", name))
-		return true
 
 	case "codex":
 		// Exit code 0 = logged in, non-zero = not logged in or command failed
 		if err := exec.Command("codex", "login", "status").Run(); err != nil {
 			errMsg(fmt.Sprintf("%s is not authenticated — run: codex login", name))
-			return false
+			return
 		}
 		info(fmt.Sprintf("%s authenticated", name))
-		return true
 	}
-	return false
 }
 
 func setupGlobalGitignore() {

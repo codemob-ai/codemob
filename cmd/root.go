@@ -867,7 +867,7 @@ func agentArgs(agent, repoRoot string) (binPath string, resumeArgs, newArgs []st
 		resumeArgs = []string{"resume", "--last", "--add-dir", repoRoot}
 		newArgs = []string{"--add-dir", repoRoot}
 	default:
-		err = fmt.Errorf("unknown agent: %s", agent)
+		return "", nil, nil, fmt.Errorf("unknown agent: %s", agent)
 	}
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("agent '%s' not found on PATH", agent)
