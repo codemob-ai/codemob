@@ -1036,6 +1036,34 @@ func TestOpenAgentMissingValue(t *testing.T) {
 	}
 }
 
+func TestOpenAgentOverridePersistsToConfig(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "agent-persist", "--no-launch")
+
+	// given -> mob was created with default agent (claude)
+	cfg := readConfig(t, repoPath)
+	mobs := cfg["mobs"].([]interface{})
+	mob := mobs[0].(map[string]interface{})
+	if mob["agent"] != "claude" {
+		t.Fatalf("expected initial agent=claude, got %v", mob["agent"])
+	}
+
+	// when -> open with --agent codex (may succeed or fail depending on codex availability)
+	cmd := exec.Command(bin, "open", "agent-persist", "--agent", "codex")
+	cmd.Dir = repoPath
+	cmd.Run() // ignore exit code - agent launch may fail, config update happens before launch
+
+	// then -> config should now say codex
+	cfg = readConfig(t, repoPath)
+	mobs = cfg["mobs"].([]interface{})
+	mob = mobs[0].(map[string]interface{})
+	if mob["agent"] != "codex" {
+		t.Errorf("expected agent=codex after --agent override, got %v", mob["agent"])
+	}
+}
+
 // ─── Path ────────────────────────────────────────────────────────────────────
 
 func TestPathByName(t *testing.T) {
