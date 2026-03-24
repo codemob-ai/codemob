@@ -1,8 +1,8 @@
 ![codemob](img/banner.png)
 
-【🌕】**Terminal-agnostic AI agent workflow manager with parallel isolated sessions.**
+<p align="center">【🌕】<b>Terminal-agnostic AI agent workflow manager with parallel isolated sessions.</b></p>
 
-_Powered by git worktrees under the hood, but you don't need to know that._
+<p align="center"><i>Powered by git worktrees under the hood, but you don't need to know that.</i></p>
 
 ---
 
