@@ -89,6 +89,8 @@ func Execute() error {
 		return cmdPurge(args)
 	case "path":
 		return cmdPath(args)
+	case "open":
+		return cmdOpen(args)
 	case "info":
 		return cmdInfo()
 
@@ -335,6 +337,65 @@ func cmdResume(args []string) error {
 	return nil
 }
 
+
+func cmdOpen(args []string) error {
+	root, cfg, err := requireInit()
+	if err != nil {
+		return err
+	}
+
+	name := ""
+	agent := ""
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--agent":
+			if i+1 >= len(args) {
+				return fmt.Errorf("--agent requires a value (e.g., --agent codex)")
+			}
+			agent = args[i+1]
+			i++
+		default:
+			if name == "" {
+				name = args[i]
+			}
+		}
+	}
+
+	if name == "" {
+		if len(cfg.Mobs) == 0 {
+			return fmt.Errorf("no mobs. Create one with: codemob new")
+		}
+		if len(cfg.Mobs) == 1 {
+			name = cfg.Mobs[0].Name
+		} else {
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+			fmt.Fprintln(w, "#\tNAME\tBRANCH\tLAST AGENT\tCREATED")
+			for i, m := range cfg.Mobs {
+				fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", i+1, m.Name, m.Branch, m.Agent, mob.RelativeTime(m.CreatedAt))
+			}
+			w.Flush()
+			fmt.Print("\nWhich mob? (#/name): ")
+			fmt.Scanln(&name)
+		}
+		if name == "" {
+			return fmt.Errorf("no mob selected")
+		}
+	}
+
+	m := resolveMob(cfg, name)
+	if m == nil {
+		return fmt.Errorf("mob '%s' not found", name)
+	}
+
+	if agent == "" {
+		agent = m.Agent
+	}
+
+	worktreePath := filepath.Join(root, mob.MobsDir, m.Name)
+	mobStatus(fmt.Sprintf("Opening mob '%s' (fresh session)", m.Name))
+
+	return launchAgent(root, agent, worktreePath, false)
+}
 
 func cmdRemove(args []string) error {
 	root, cfg, err := requireInit()
@@ -858,7 +919,8 @@ func printUsage() {
 	fmt.Println("Commands:")
 	fmt.Println("  new [name]         Create a new mob and launch agent")
 	fmt.Println("  list               List all mobs")
-	fmt.Println("  resume [name]      Resume a mob (launch agent in worktree)")
+	fmt.Println("  resume [name]      Resume a mob (continue previous session)")
+	fmt.Println("  open [name]        Open a mob (fresh agent session)")
 	fmt.Println("  init               Initialize codemob (global + repo setup)")
 	fmt.Println("  reinit             Re-run initialization (idempotent)")
 	fmt.Println("  remove <name>      Remove a mob")
