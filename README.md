@@ -57,7 +57,9 @@ Switch between sessions — `/mob-switch`, pick one, exit, done:
   1  wild-kumquat     claude      2h ago
   2  angry-eggplant   claude      12h ago
 
-  Which mob? → 1
+  Which mob?
+
+❯ 1
 
 ⏺ Switch queued. Exit (Ctrl+C) and codemob launches the next session.
 
