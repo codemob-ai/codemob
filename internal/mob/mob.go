@@ -45,6 +45,19 @@ func FindRepoRoot() (string, error) {
 	return gitutil.RepoRoot()
 }
 
+// InsideWorktree returns the repo root if the current directory is inside a
+// codemob worktree, or empty string if not.
+func InsideWorktree() string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	if idx := strings.Index(cwd, "/"+MobsDir+"/"); idx != -1 {
+		return cwd[:idx]
+	}
+	return ""
+}
+
 // IsInitialized checks if codemob is initialized in the given repo.
 func IsInitialized(repoRoot string) bool {
 	_, err := os.Stat(filepath.Join(repoRoot, CodemobDir))
