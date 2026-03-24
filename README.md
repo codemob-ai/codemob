@@ -8,7 +8,8 @@ _Powered by git worktrees under the hood, but you don't need to know that._
 
 ## Why
 
-> **Working on multiple things at once with AI agents in a single repository is a non-trivial problem.**
+| :exclamation: Working on multiple things at once with AI agents in a single repository is a non-trivial problem. |
+|---|
 
 `claude --worktree` solves it — creates an isolated worktree, launches a session, offers to clean up when you're done. Until you decide not to clean up, because you want to come back to it later. Then it's just a directory somewhere that you need to track down, `cd` into, and relaunch the agent in manually.
 
