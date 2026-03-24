@@ -905,9 +905,6 @@ func cmdInjectArgs(args []string) error {
 		fmt.Println(repoRoot)
 		fmt.Println("--append-system-prompt")
 		fmt.Println(hint)
-	case "codex":
-		fmt.Println("--add-dir")
-		fmt.Println(repoRoot)
 	}
 	return nil
 }
@@ -930,8 +927,8 @@ func agentArgs(agent, repoRoot string) (binPath string, resumeArgs, newArgs []st
 		newArgs = []string{"--add-dir", repoRoot, "--append-system-prompt", hint}
 	case "codex":
 		binPath, err = exec.LookPath("codex")
-		resumeArgs = []string{"resume", "--last", "--add-dir", repoRoot}
-		newArgs = []string{"--add-dir", repoRoot}
+		resumeArgs = []string{"resume", "--last"}
+		newArgs = []string{}
 	default:
 		return "", nil, nil, fmt.Errorf("unknown agent: %s", agent)
 	}
