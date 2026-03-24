@@ -157,7 +157,26 @@ func Init(installDir string, forceReprompt bool) error {
 	fmt.Println("codemob init")
 	fmt.Println("────────────")
 	fmt.Println()
+	warn("This will:")
+	fmt.Println("  - Add shell integration (mob alias, claude/codex wrappers) to your shell RC file")
+	fmt.Println("  - Add codemob entries to global gitignore")
+	fmt.Println("  - Add codemob permissions to Claude settings (if installed)")
+	fmt.Println("  - Initialize .codemob/ config in the current repo")
+	fmt.Println("  - Install slash commands for your AI agents")
+	fmt.Println()
+	fmt.Printf("  All of this can be easily reverted with: %scodemob uninstall%s\n", green, reset)
+	fmt.Println()
+	fmt.Print("Continue? [Y/n]: ")
 
+	reader := bufio.NewReader(os.Stdin)
+	input, _ := reader.ReadString('\n')
+	input = strings.TrimSpace(strings.ToLower(input))
+	if input == "n" || input == "no" {
+		fmt.Println("Cancelled.")
+		return nil
+	}
+
+	fmt.Println()
 	fmt.Println("Global setup:")
 	claude, codex, err := checkDependencies()
 	if err != nil {

@@ -1021,6 +1021,21 @@ func TestOpenNoMobs(t *testing.T) {
 	}
 }
 
+func TestOpenAgentMissingValue(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "agent-test", "--no-launch")
+
+	// when
+	out := runCoreExpectError(t, bin, repoPath, "open", "agent-test", "--agent")
+
+	// then
+	if !strings.Contains(out, "--agent requires a value") {
+		t.Errorf("expected '--agent requires a value' error, got: %s", out)
+	}
+}
+
 // ─── Path ────────────────────────────────────────────────────────────────────
 
 func TestPathByName(t *testing.T) {
