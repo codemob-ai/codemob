@@ -16,33 +16,34 @@ import (
 	"github.com/codemob-ai/codemob/internal/mob"
 )
 
+func brandPrefix(color string) string {
+	if color == "" {
+		color = "\033[38;2;231;220;96m"
+	}
+	return fmt.Sprintf("  %s【●】codemob\033[0m  ", color)
+}
+
 func mobStatus(msg string) {
 	fmt.Println()
-	// Brand accent: #e7dc60
-	fmt.Printf("  \033[38;2;231;220;96m● codemob\033[0m  %s\n", msg)
+	fmt.Printf("%s%s\n", brandPrefix(""), msg)
 	fmt.Println()
 }
 
-// mobProgress prints a transient progress line and returns a handle to finish it.
-// Use defer p.Clear() immediately after calling to guarantee cleanup on any exit path.
 type progress struct{ active bool }
 
 func mobProgress(msg string) *progress {
-	// Leading blank line + message, no trailing newline — cursor stays on this line
-	fmt.Printf("\n  \033[38;2;231;220;96m● codemob\033[0m  %s", msg)
+	fmt.Printf("\n%s%s", brandPrefix(""), msg)
 	return &progress{active: true}
 }
 
-// Done replaces the progress line with a final status message.
 func (p *progress) Done(msg string) {
 	if !p.active {
 		return
 	}
 	p.active = false
-	fmt.Printf("\r\033[2K  \033[38;2;231;220;96m● codemob\033[0m  %s\n\n", msg)
+	fmt.Printf("\r\033[2K%s%s\n\n", brandPrefix(""), msg)
 }
 
-// Clear removes the progress line without replacing it.
 func (p *progress) Clear() {
 	if !p.active {
 		return
@@ -570,7 +571,7 @@ func cmdPurge(_ []string) error {
 	os.RemoveAll(filepath.Join(root, mob.CodemobDir, "sessions"))
 
 	fmt.Println()
-	fmt.Printf("  %s● codemob%s  All mobs purged\n", r, rst)
+	fmt.Printf("%sAll mobs purged\n", brandPrefix(r))
 	fmt.Println()
 	return nil
 }
