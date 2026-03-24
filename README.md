@@ -11,7 +11,7 @@
 > [!WARNING]
 > Working on **multiple things at once** with AI agents in a **single repository** is a non-trivial problem.
 
-【🌗】`claude --worktree` solves it. Kind of... Creates an isolated worktree, launches a session, offers to clean up when you're done. Until you decide not to clean up, because you want to come back to it later. Then it's just a directory somewhere that you need to track down, `cd` into, and relaunch the agent in manually.
+【🌗】`claude --worktree` solves it. Kind of... Creates an isolated worktree, launches a session, offers to clean up when you're done. Until you decide not to clean up, because you want to come back to it later. Then it's just a directory somewhere that you need to track down, `cd` into, and relaunch the agent manually.
 
 【🌕】`codemob` manages the full lifecycle - _create_, _resume_, _list_, _switch_, _clean up_.
 
@@ -152,8 +152,6 @@ codemob remove brave-mango       # remove one
 codemob purge                    # remove all
 ```
 
-Shell aliases (`claude --new-mob`, `claude --mob`, `codex --new-mob`, `mob new`) also work after `codemob init`.
-
 ### Inside Claude Code / Codex
 
 | Command | |
@@ -164,7 +162,8 @@ Shell aliases (`claude --new-mob`, `claude --mob`, `codex --new-mob`, `mob new`)
 | `/codemob-change-agent` | Swap agent (claude <-> codex) |
 | `/codemob-remove` | Remove mob |
 
-Also available as `/mob-*`.
+> [!NOTE]
+> Also available as `/mob-*`.
 
 ## How the agent flags work (they don't)
 
@@ -174,9 +173,9 @@ Also available as `/mob-*`.
 
 No patches, no plugins, no monkey-patching. Just a shell function pretending to be `claude` and skimming a few arguments off the top.
 
-## How it works
+## Under the hood
 
-Each mob is a git worktree under `.codemob/mobs/`. Agents are launched as child processes. When you queue a switch from inside an agent (via slash command), codemob picks it up after exit and launches the next session.
+【🌕】Each mob is a git worktree under `.codemob/mobs/`. Agents are launched as child processes. When you queue a switch from inside an agent (via slash command), codemob picks it up after exit and launches the next session.
 
 Git is the source of truth. Stale metadata gets cleaned up automatically.
 
