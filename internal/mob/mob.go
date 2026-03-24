@@ -191,7 +191,19 @@ func CurrentMobName() string {
 	if name := os.Getenv("CODEMOB_MOB"); name != "" {
 		return name
 	}
+	return currentMobNameFromCwd("")
+}
 
+// CurrentMobNameForRoot returns the mob name when the repo root is already known,
+// avoiding a redundant InsideWorktree call.
+func CurrentMobNameForRoot(repoRoot string) string {
+	if name := os.Getenv("CODEMOB_MOB"); name != "" {
+		return name
+	}
+	return currentMobNameFromCwd(repoRoot)
+}
+
+func currentMobNameFromCwd(knownRoot string) string {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return ""
@@ -208,9 +220,12 @@ func CurrentMobName() string {
 	}
 
 	// Slow path: external worktrees - load config and match cwd against mob paths
-	root := InsideWorktree()
+	root := knownRoot
 	if root == "" {
-		return ""
+		root = InsideWorktree()
+		if root == "" {
+			return ""
+		}
 	}
 	cfg, err := LoadConfig(root)
 	if err != nil {

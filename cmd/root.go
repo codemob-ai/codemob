@@ -913,7 +913,7 @@ func cmdInjectArgs(args []string) error {
 		return nil
 	}
 
-	mobName := mob.CurrentMobName()
+	mobName := mob.CurrentMobNameForRoot(repoRoot)
 	if mobName != "" {
 		fmt.Printf("CODEMOB_MOB=%s\n", mobName)
 	}
