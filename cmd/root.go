@@ -437,8 +437,15 @@ func cmdOpen(args []string) error {
 	}
 
 	if name == "" {
+		lastMob := readLastMob(root)
+		if lastMob != "" && mob.FindMob(cfg, lastMob) == nil {
+			lastMob = ""
+		}
 		var err error
-		name, err = pickMob(cfg, pickerOpts{})
+		name, err = pickMob(cfg, pickerOpts{
+			markerName: lastMob,
+			defaultVal: lastMob,
+		})
 		if err != nil {
 			return err
 		}
