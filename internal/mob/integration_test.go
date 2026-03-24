@@ -1158,6 +1158,36 @@ func TestPathNoMobs(t *testing.T) {
 	}
 }
 
+func TestNewMobNoCommits(t *testing.T) {
+	bin := buildCore(t)
+
+	// given -> a repo with no commits
+	tmpHome := t.TempDir()
+	t.Setenv("HOME", tmpHome)
+
+	stubDir := filepath.Join(tmpHome, "bin")
+	os.MkdirAll(stubDir, 0755)
+	stubPath := filepath.Join(stubDir, "claude")
+	stubScript := "#!/bin/sh\ncase \"$1\" in\n  --version) echo \"claude-stub 0.0.0\" ;;\n  auth) echo '{\"loggedIn\":true}' ;;\n  *) exit 0 ;;\nesac\n"
+	os.WriteFile(stubPath, []byte(stubScript), 0755)
+	t.Setenv("PATH", stubDir+":"+os.Getenv("PATH"))
+
+	repoPath := filepath.Join(tmpHome, "test-repo")
+	os.MkdirAll(repoPath, 0755)
+	run(t, repoPath, "git", "init", "-b", "main")
+	run(t, repoPath, "git", "config", "user.email", "test@codemob.ai")
+	run(t, repoPath, "git", "config", "user.name", "codemob-test")
+	initRepo(t, bin, repoPath)
+
+	// when
+	out := runCoreExpectError(t, bin, repoPath, "new", "test-mob", "--no-launch")
+
+	// then
+	if !strings.Contains(out, "no commits") {
+		t.Errorf("expected 'no commits' error, got: %s", out)
+	}
+}
+
 func TestPathReservedName(t *testing.T) {
 	bin := buildCore(t)
 	_, repoPath := setupTestRepo(t)
