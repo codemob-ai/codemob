@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"syscall"
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -214,6 +215,73 @@ func requireInit() (string, *mob.Config, error) {
 	return root, cfg, nil
 }
 
+// createMob handles the full mob-creation sequence: name validation/generation,
+// worktree creation, config update, and save. Returns the worktree path.
+func createMob(root string, cfg *mob.Config, name, agent string) (string, error) {
+	if name == "" {
+		name = mob.GenerateUniqueName(cfg)
+	} else {
+		if err := mob.ValidateName(name); err != nil {
+			return "", err
+		}
+		if m := mob.FindMob(cfg, name); m != nil {
+			return "", fmt.Errorf("mob '%s' already exists", name)
+		}
+	}
+
+	branch := "mob/" + name
+	worktreePath := filepath.Join(root, mob.MobsDir, name)
+
+	p := mobProgress(fmt.Sprintf("Creating mob '%s'...", name))
+	defer p.Clear()
+
+	if err := gitutil.WorktreeAdd(root, worktreePath, branch, cfg.BaseBranch); err != nil {
+		return "", err
+	}
+
+	cfg.Mobs = append(cfg.Mobs, mob.Mob{
+		Name:      name,
+		Branch:    branch,
+		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+		Agent:     agent,
+	})
+
+	if err := mob.SaveConfig(root, cfg); err != nil {
+		return "", err
+	}
+
+	p.Done(fmt.Sprintf("Created mob '%s' on branch %s", name, branch))
+	return worktreePath, nil
+}
+
+// removeMob handles the full mob-removal sequence: worktree removal, branch deletion,
+// config update, save, and session file cleanup.
+func removeMob(root string, cfg *mob.Config, m *mob.Mob, force bool) error {
+	worktreePath := filepath.Join(root, mob.MobsDir, m.Name)
+	if _, err := os.Stat(worktreePath); err == nil {
+		if err := gitutil.WorktreeRemove(root, worktreePath, force); err != nil {
+			return err
+		}
+	}
+
+	gitutil.BranchDelete(root, m.Branch)
+
+	var remaining []mob.Mob
+	for _, existing := range cfg.Mobs {
+		if existing.Name != m.Name {
+			remaining = append(remaining, existing)
+		}
+	}
+	cfg.Mobs = remaining
+
+	if err := mob.SaveConfig(root, cfg); err != nil {
+		return err
+	}
+
+	cleanSessionFiles(root, m.Name)
+	return nil
+}
+
 func cmdNew(args []string) error {
 	root, cfg, err := requireInit()
 	if err != nil {
@@ -243,39 +311,10 @@ func cmdNew(args []string) error {
 		}
 	}
 
-	if name == "" {
-		name = mob.GenerateUniqueName(cfg)
-	} else {
-		if err := mob.ValidateName(name); err != nil {
-			return err
-		}
-		if m := mob.FindMob(cfg, name); m != nil {
-			return fmt.Errorf("mob '%s' already exists", name)
-		}
-	}
-
-	branch := "mob/" + name
-	worktreePath := filepath.Join(root, mob.MobsDir, name)
-
-	p := mobProgress(fmt.Sprintf("Creating mob '%s'...", name))
-	defer p.Clear()
-
-	if err := gitutil.WorktreeAdd(root, worktreePath, branch, cfg.BaseBranch); err != nil {
+	worktreePath, err := createMob(root, cfg, name, agent)
+	if err != nil {
 		return err
 	}
-
-	cfg.Mobs = append(cfg.Mobs, mob.Mob{
-		Name:      name,
-		Branch:    branch,
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
-		Agent:     agent,
-	})
-
-	if err := mob.SaveConfig(root, cfg); err != nil {
-		return err
-	}
-
-	p.Done(fmt.Sprintf("Created mob '%s' on branch %s", name, branch))
 
 	if !noLaunch {
 		return launchAgent(root, agent, worktreePath, false)
@@ -449,28 +488,10 @@ func cmdRemove(args []string) error {
 		return fmt.Errorf("mob '%s' not found", name)
 	}
 
-	worktreePath := filepath.Join(root, mob.MobsDir, m.Name)
-	if _, err := os.Stat(worktreePath); err == nil {
-		if err := gitutil.WorktreeRemove(root, worktreePath, force); err != nil {
-			return err
-		}
-	}
-
-	_ = gitutil.BranchDelete(root, m.Branch)
-
-	var remaining []mob.Mob
-	for _, existing := range cfg.Mobs {
-		if existing.Name != m.Name {
-			remaining = append(remaining, existing)
-		}
-	}
-	cfg.Mobs = remaining
-
-	if err := mob.SaveConfig(root, cfg); err != nil {
+	if err := removeMob(root, cfg, m, force); err != nil {
 		return err
 	}
 
-	cleanSessionFiles(root, m.Name)
 	mobStatus(fmt.Sprintf("Removed mob '%s'", m.Name))
 	return nil
 }
@@ -537,7 +558,7 @@ func cmdPurge(_ []string) error {
 		if _, err := os.Stat(worktreePath); err == nil {
 			_ = gitutil.WorktreeRemove(root, worktreePath, true)
 		}
-		_ = gitutil.BranchDelete(root, m.Branch)
+		gitutil.BranchDelete(root, m.Branch)
 		fmt.Printf("  %s✗%s Removed '%s'\n", r, rst, m.Name)
 	}
 
@@ -650,43 +671,14 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 		return filepath.Join(root, mob.MobsDir, m.Name), newAgent, false, nil
 
 	case "new":
-		name := next.Target
-		if name == "" {
-			name = mob.GenerateUniqueName(cfg)
-		} else {
-			if err := mob.ValidateName(name); err != nil {
-				return "", "", false, err
-			}
-			if m := mob.FindMob(cfg, name); m != nil {
-				return "", "", false, fmt.Errorf("mob '%s' already exists", name)
-			}
-		}
-		branch := "mob/" + name
-		worktreePath := filepath.Join(root, mob.MobsDir, name)
-
-		p := mobProgress(fmt.Sprintf("Creating mob '%s'...", name))
-		defer p.Clear()
-
-		if err := gitutil.WorktreeAdd(root, worktreePath, branch, cfg.BaseBranch); err != nil {
-			return "", "", false, err
-		}
-
 		agent := next.Agent
 		if agent == "" {
 			agent = cfg.DefaultAgent
 		}
-
-		cfg.Mobs = append(cfg.Mobs, mob.Mob{
-			Name:      name,
-			Branch:    branch,
-			CreatedAt: time.Now().UTC().Format(time.RFC3339),
-			Agent:     agent,
-		})
-		if err := mob.SaveConfig(root, cfg); err != nil {
+		worktreePath, err := createMob(root, cfg, next.Target, agent)
+		if err != nil {
 			return "", "", false, err
 		}
-
-		p.Done(fmt.Sprintf("Created mob '%s' on branch %s", name, branch))
 		return worktreePath, agent, false, nil
 
 	case "remove":
@@ -698,22 +690,11 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 		if m == nil {
 			return "", "", false, fmt.Errorf("mob '%s' not found", name)
 		}
-		worktreePath := filepath.Join(root, mob.MobsDir, m.Name)
-		if _, statErr := os.Stat(worktreePath); statErr == nil {
-			_ = gitutil.WorktreeRemove(root, worktreePath, true)
+		if err := removeMob(root, cfg, m, true); err != nil {
+			return "", "", false, err
 		}
-		_ = gitutil.BranchDelete(root, m.Branch)
-		var remaining []mob.Mob
-		for _, existing := range cfg.Mobs {
-			if existing.Name != m.Name {
-				remaining = append(remaining, existing)
-			}
-		}
-		cfg.Mobs = remaining
-		_ = mob.SaveConfig(root, cfg)
-		cleanSessionFiles(root, m.Name)
 		mobStatus(fmt.Sprintf("Removed mob '%s'", m.Name))
-		return "", "", false, nil // no agent to launch
+		return "", "", false, nil
 
 	default:
 		return "", "", false, fmt.Errorf("unknown next action: %s", next.Action)
@@ -903,7 +884,7 @@ func spawnAgent(binPath string, args []string, workdir string) error {
 
 	// Forward signals to child, clean up goroutine on exit
 	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 	done := make(chan struct{})
 	go func() {
 		select {

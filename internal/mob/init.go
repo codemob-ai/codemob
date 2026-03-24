@@ -116,10 +116,9 @@ func CodexPrompts(multipleAgents bool) map[string]string {
 
 const (
 	green  = "\033[38;2;106;191;105m" // #6abf69 — bright green derived from brand #002900
-	yellow = "\033[38;2;231;220;96m"  // #e7dc60 — brand accent
+	accent = "\033[38;2;231;220;96m"  // #e7dc60 — brand accent
 	red    = "\033[38;2;217;83;79m"   // #d9534f — warm red to match brand palette
 	reset  = "\033[0m"
-	accent = "\033[38;2;231;220;96m" // #e7dc60 — brand accent
 
 	ColorRed   = red
 	ColorReset = reset
@@ -148,7 +147,7 @@ func PrintBanner(color string) {
 }
 
 func info(msg string)   { fmt.Printf("%s✓ %s%s\n", green, msg, reset) }
-func warn(msg string)   { fmt.Printf("%s! %s%s\n", yellow, msg, reset) }
+func warn(msg string)   { fmt.Printf("%s! %s%s\n", accent, msg, reset) }
 func errMsg(msg string) { fmt.Printf("%s✗ %s%s\n", red, msg, reset) }
 
 // Init performs the full codemob initialization.
@@ -194,8 +193,7 @@ func Init(installDir string, forceReprompt bool) error {
 }
 
 type agentStatus struct {
-	installed     bool
-	authenticated bool
+	installed bool
 }
 
 // checkDependencies checks git and agent availability. Returns per-agent status.
@@ -237,8 +235,8 @@ func checkAgent(name, installHint string) agentStatus {
 	}
 	info(fmt.Sprintf("%s found (%s)", name, version))
 
-	auth := checkAgentAuth(name)
-	return agentStatus{installed: true, authenticated: auth}
+	checkAgentAuth(name)
+	return agentStatus{installed: true}
 }
 
 // checkAgentAuth is a best-effort auth check. Never blocks init.
@@ -392,12 +390,6 @@ var codemobPermissions = []string{
 }
 
 func setupClaudePermissions() {
-	defer func() {
-		if r := recover(); r != nil {
-			warn(fmt.Sprintf("Could not configure Claude permissions: %v", r))
-		}
-	}()
-
 	settingsPath := filepath.Join(os.Getenv("HOME"), ".claude", "settings.json")
 
 	// Read existing settings or start fresh
@@ -464,12 +456,6 @@ func setupClaudePermissions() {
 }
 
 func removeClaudePermissions() {
-	defer func() {
-		if r := recover(); r != nil {
-			warn(fmt.Sprintf("Could not clean up Claude permissions: %v", r))
-		}
-	}()
-
 	settingsPath := filepath.Join(os.Getenv("HOME"), ".claude", "settings.json")
 
 	data, err := os.ReadFile(settingsPath)
@@ -684,7 +670,7 @@ func Uninstall(installDir string) error {
 			for _, m := range cfg.Mobs {
 				worktreePath := filepath.Join(repoRoot, MobsDir, m.Name)
 				_ = gitutil.WorktreeRemove(repoRoot, worktreePath, true)
-				_ = gitutil.BranchDelete(repoRoot, m.Branch)
+				gitutil.BranchDelete(repoRoot, m.Branch)
 			}
 		}
 		// Remove .codemob/ directory

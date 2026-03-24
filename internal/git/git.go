@@ -50,9 +50,8 @@ func WorktreeRemove(repoRoot, path string, force bool) error {
 	return nil
 }
 
-func BranchDelete(repoRoot, branch string) error {
+func BranchDelete(repoRoot, branch string) {
 	_, _ = runGit(repoRoot, "branch", "-D", branch) // best-effort
-	return nil
 }
 
 func DetectDefaultBranch(repoRoot string) string {
