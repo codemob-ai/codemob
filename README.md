@@ -15,10 +15,7 @@ _Powered by git worktrees under the hood, but you don't need to know that._
 
 【🌕】`codemob` manages the full lifecycle — _create_, _resume_, _list_, _switch_, _clean up_.
 
-> [!NOTE]
-> **Claude** (primary focus) and **Codex** supported out of the box.
->
-> Other terminal-based agents work too — `codemob cd` drops you into the workspace.
+**Claude** (primary focus) and **Codex** supported out of the box. Other terminal-based agents work too — `codemob cd` drops you into the workspace.
 
 ## 【🌕】How
 
