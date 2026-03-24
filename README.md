@@ -166,7 +166,7 @@ Also available as `/mob-*`.
 
 `--new-mob`, `--resume-mob`, and friends aren't real Claude or Codex flags. They never reach the agent.
 
-🌕 `codemob init` sources a small shell script into your `.zshrc` that wraps the `claude` and `codex` commands. When you type `claude --new-mob`, the wrapper intercepts the flag before Claude ever sees it and routes it to `codemob new --agent claude` instead. Any flag it doesn't recognize? Passed straight through to the real `claude` binary, untouched.
+【🌕】`codemob init` sources a small shell script into your `.zshrc` that wraps the `claude` and `codex` commands. When you type `claude --new-mob`, the wrapper intercepts the flag before Claude ever sees it and routes it to `codemob new --agent claude` instead. Any flag it doesn't recognize? Passed straight through to the real `claude` binary, untouched.
 
 No patches, no plugins, no monkey-patching. Just a shell function pretending to be `claude` and skimming a few arguments off the top.
 
