@@ -55,7 +55,7 @@ func cmdInfo() error {
 
 	// --- Worktrees on disk ---
 	section("Worktrees on disk")
-	mobsPath := filepath.Join(root, mob.MobsDir)
+	mobsPath := mob.MobsPath(root, cfg)
 	entries, err := os.ReadDir(mobsPath)
 	if err != nil {
 		kv("mobs dir", "(not found)")

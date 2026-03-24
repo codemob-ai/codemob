@@ -250,7 +250,7 @@ func createMob(root string, cfg *mob.Config, name, agent string) (string, error)
 	}
 
 	branch := "mob/" + name
-	worktreePath := filepath.Join(root, mob.MobsDir, name)
+	worktreePath := mob.MobPath(root, cfg, name)
 
 	p := mobProgress(fmt.Sprintf("Creating mob '%s'...", name))
 	defer p.Clear()
@@ -277,7 +277,7 @@ func createMob(root string, cfg *mob.Config, name, agent string) (string, error)
 // removeMob handles the full mob-removal sequence: worktree removal, branch deletion,
 // config update, save, and session file cleanup.
 func removeMob(root string, cfg *mob.Config, m *mob.Mob, force bool) error {
-	worktreePath := filepath.Join(root, mob.MobsDir, m.Name)
+	worktreePath := mob.MobPath(root, cfg, m.Name)
 	if _, err := os.Stat(worktreePath); err == nil {
 		if err := gitutil.WorktreeRemove(root, worktreePath, force); err != nil {
 			return err
@@ -420,7 +420,7 @@ func cmdResume(args []string) error {
 		return fmt.Errorf("mob '%s' not found", name)
 	}
 
-	worktreePath := filepath.Join(root, mob.MobsDir, m.Name)
+	worktreePath := mob.MobPath(root, cfg, m.Name)
 	mobStatus(fmt.Sprintf("Resuming mob '%s'", m.Name))
 
 	if !noLaunch {
@@ -482,7 +482,7 @@ func cmdOpen(args []string) error {
 		_ = mob.SaveConfig(root, cfg)
 	}
 
-	worktreePath := filepath.Join(root, mob.MobsDir, m.Name)
+	worktreePath := mob.MobPath(root, cfg, m.Name)
 	mobStatus(fmt.Sprintf("Opening mob '%s' (fresh session)", m.Name))
 
 	return launchAgent(root, agent, worktreePath, false)
@@ -588,12 +588,22 @@ func cmdPurge(_ []string) error {
 	mob.PrintBanner(mob.ColorRed)
 
 	for _, m := range cfg.Mobs {
-		worktreePath := filepath.Join(root, mob.MobsDir, m.Name)
+		worktreePath := mob.MobPath(root, cfg, m.Name)
 		if _, err := os.Stat(worktreePath); err == nil {
 			_ = gitutil.WorktreeRemove(root, worktreePath, true)
 		}
 		gitutil.BranchDelete(root, m.Branch)
 		fmt.Printf("  %s✗%s Removed '%s'\n", r, rst, m.Name)
+	}
+
+	// Clean up external mobs directory if empty
+	if cfg.MobsDirPath != "" {
+		entries, err := os.ReadDir(cfg.MobsDirPath)
+		if err == nil && len(entries) == 0 {
+			os.Remove(cfg.MobsDirPath)
+			parent := filepath.Dir(cfg.MobsDirPath)
+			os.Remove(parent)
+		}
 	}
 
 	cfg.Mobs = nil
@@ -647,7 +657,7 @@ func cmdPath(args []string) error {
 		return fmt.Errorf("mob '%s' not found", name)
 	}
 
-	fmt.Println(filepath.Join(root, mob.MobsDir, m.Name))
+	fmt.Println(mob.MobPath(root, cfg, m.Name))
 	return nil
 }
 
@@ -680,7 +690,7 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 			return "", "", false, fmt.Errorf("mob '%s' not found", next.Target)
 		}
 		mobStatus(fmt.Sprintf("Switching to mob '%s'", m.Name))
-		return filepath.Join(root, mob.MobsDir, m.Name), m.Agent, true, nil
+		return mob.MobPath(root, cfg, m.Name), m.Agent, true, nil
 
 	case "change-agent":
 		currentName := next.Mob
@@ -702,7 +712,7 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 		m.Agent = newAgent
 		_ = mob.SaveConfig(root, cfg)
 		mobStatus(fmt.Sprintf("Switching mob '%s' to agent '%s'", m.Name, newAgent))
-		return filepath.Join(root, mob.MobsDir, m.Name), newAgent, false, nil
+		return mob.MobPath(root, cfg, m.Name), newAgent, false, nil
 
 	case "new":
 		agent := next.Agent
@@ -897,6 +907,11 @@ func cmdInjectArgs(args []string) error {
 		return nil
 	}
 
+	mobName := mob.CurrentMobName()
+	if mobName != "" {
+		fmt.Printf("CODEMOB_MOB=%s\n", mobName)
+	}
+
 	hint := worktreeHint(repoRoot)
 
 	switch agent {
@@ -944,6 +959,7 @@ func spawnAgent(binPath string, args []string, workdir string) error {
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	cmd.Env = append(os.Environ(), "CODEMOB_MOB="+filepath.Base(workdir))
 
 	// Forward signals to child, clean up goroutine on exit
 	sigCh := make(chan os.Signal, 1)
