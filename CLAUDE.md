@@ -114,6 +114,12 @@ Makefile                # build/install/test
 }
 ```
 
+## CLI conventions
+
+**Flag rejection:** Every command must explicitly reject unknown `--` flags with a clear error. Never silently treat a flag-like arg as a positional value (e.g., `--typo` should not become a mob name). Each command's arg-parsing loop has its own `strings.HasPrefix(arg, "--")` check in the default branch.
+
+**Interactive picker:** When a command needs the user to select a mob, use the shared `pickMob()` function in `root.go`. Configure it via `pickerOpts` (marker, default value, root hint, output writer) rather than duplicating the table/prompt logic.
+
 ## Core/shell interface
 
 The Go binary is the primary interface — it handles everything including agent launching (as child processes with a trampoline loop). The shell script is an optional enhancement that provides `mob` alias and `claude --new-mob` / `codex --new-mob` wrappers, plus post-exit queue checking.

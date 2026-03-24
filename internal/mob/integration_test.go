@@ -785,6 +785,35 @@ func TestResumeRejectsUnknownFlags(t *testing.T) {
 	}
 }
 
+func TestNewRejectsUnknownFlags(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	// when
+	out := runCoreExpectError(t, bin, repoPath, "new", "--typo", "--no-launch")
+
+	// then
+	if !strings.Contains(out, "unknown flag") {
+		t.Errorf("expected unknown flag error, got: %s", out)
+	}
+}
+
+func TestRemoveRejectsUnknownFlags(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "test-mob", "--no-launch")
+
+	// when
+	out := runCoreExpectError(t, bin, repoPath, "remove", "--typo")
+
+	// then
+	if !strings.Contains(out, "unknown flag") {
+		t.Errorf("expected unknown flag error, got: %s", out)
+	}
+}
+
 // ─── Session Tracking ─────────────────────────────────────────────────────────
 
 // writeSessionFile creates a session file mapping a session ID to a mob name.

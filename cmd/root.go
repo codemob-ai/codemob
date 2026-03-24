@@ -225,15 +225,17 @@ func cmdNew(args []string) error {
 	noLaunch := false
 
 	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--no-launch":
+		switch {
+		case args[i] == "--no-launch":
 			noLaunch = true
-		case "--agent":
+		case args[i] == "--agent":
 			if i+1 >= len(args) {
 				return fmt.Errorf("--agent requires a value (e.g., --agent codex)")
 			}
 			agent = args[i+1]
 			i++
+		case strings.HasPrefix(args[i], "--"):
+			return fmt.Errorf("unknown flag for new: %s", args[i])
 		default:
 			if name == "" {
 				name = args[i]
@@ -426,9 +428,11 @@ func cmdRemove(args []string) error {
 	name := ""
 	force := false
 	for _, arg := range args {
-		switch arg {
-		case "--force", "-f":
+		switch {
+		case arg == "--force" || arg == "-f":
 			force = true
+		case strings.HasPrefix(arg, "--"):
+			return fmt.Errorf("unknown flag for remove: %s", arg)
 		default:
 			if name == "" {
 				name = arg
