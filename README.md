@@ -162,9 +162,11 @@ codemob purge                    # remove all
 
 | | **Claude** | **Codex** |
 |---|---|---|
-| Create | `claude --new-codemob` | `codex --new-codemob` |
-| Resume | `claude --resume-codemob <name>` | `codex --resume-codemob <name>` |
-| Open | `claude --open-codemob <name>` | `codex --open-codemob <name>` |
+| Create | `claude --new-codemob [name]` | `codex --new-codemob [name]` |
+| Resume | `claude --resume-codemob [name]` | `codex --resume-codemob [name]` |
+| Open | `claude --open-codemob [name]` | `codex --open-codemob [name]` |
+
+*`[name]` is optional — omit it and codemob will show an interactive picker.*
 
 ### Inside Claude Code / Codex
 
