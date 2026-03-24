@@ -6,6 +6,11 @@
 
 ---
 
+> [!IMPORTANT]
+> `codemob` and `mob` are interchangeable everywhere - commands, flags, slash commands.
+>
+> `codemob new` = `mob new`, `claude --new-codemob` = `claude --new-mob`, `/codemob-new` = `/mob-new`
+
 ## Why
 
 > [!WARNING]
@@ -159,9 +164,6 @@ codemob purge                    # remove all
 | `/codemob-switch` | Switch mob (launches after exit) |
 | `/codemob-change-agent` | Swap agent (claude <-> codex) |
 | `/codemob-remove` | Remove mob |
-
-> [!IMPORTANT]
-> `codemob` and `mob` are interchangeable everywhere - commands, flags, slash commands. So `--new-codemob` works as `--new-mob`, `/codemob-new` works as `/mob-new`, etc.
 
 ## How the agent flags work (they don't)
 
