@@ -145,12 +145,16 @@ codemob new --agent codex        # pick agent
 claude --new-codemob             # shorthand, launches claude
 claude --new-codemob brave-mango # shorthand with name
 claude --codemob                 # even shorter
+claude --open-codemob brave-mango # fresh session (no continue)
 codex --new-codemob              # shorthand, launches codex
 
 # manage
 codemob list                     # list mobs (with indices)
-codemob resume brave-mango       # resume by name
+codemob resume brave-mango       # resume by name (continues session)
 codemob resume 2                 # resume by index
+codemob open brave-mango         # open with a fresh agent session
+codemob cd brave-mango           # cd into a mob's worktree
+codemob cd root                  # cd back to the main repo
 codemob remove brave-mango       # remove one
 codemob purge                    # remove all
 ```
