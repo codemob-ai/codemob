@@ -133,7 +133,7 @@ codemob init
 ## Usage
 
 > [!IMPORTANT]
-> `codemob` and `mob` are interchangeable everywhere - commands, flags, slash commands.
+> **`codemob` and `mob` are interchangeable everywhere** - commands, flags, slash commands.
 >
 > `codemob new` = `mob new`, `claude --new-codemob` = `claude --new-mob`, `/codemob-new` = `/mob-new`
 
@@ -166,7 +166,7 @@ codemob purge                    # remove all
 | Resume | `claude --resume-codemob [name]` | `codex --resume-codemob [name]` |
 | Open | `claude --open-codemob [name]` | `codex --open-codemob [name]` |
 
-*`[name]` is optional — omit it and codemob will show an interactive picker.*
+`[name]` *is optional — omit it and codemob will show an interactive picker.*
 
 ### Inside Claude Code / Codex
 
