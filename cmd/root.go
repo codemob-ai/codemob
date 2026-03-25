@@ -238,8 +238,12 @@ func requireInit() (string, *mob.Config, error) {
 			resolvedRoot = root
 		}
 		if resolvedCfgRoot != resolvedRoot {
-			fmt.Fprintf(os.Stderr, "  \033[33m!\033[0m Repo appears to have moved (was %s). External mobs may be lost.\n", cfg.RepoRoot)
-			fmt.Fprintf(os.Stderr, "    Run 'codemob reinit' to update the config.\n")
+			return "", nil, fmt.Errorf("repo has moved (was %s). Run 'codemob reinit' to update the config", cfg.RepoRoot)
+		}
+	}
+	if cfg.MobsDirPath != "" {
+		if _, err := os.Stat(cfg.MobsDirPath); err != nil {
+			return "", nil, fmt.Errorf("mobs directory %s no longer exists. Run 'codemob reinit' to fix", cfg.MobsDirPath)
 		}
 	}
 	if removed := mob.Reconcile(root, cfg); len(removed) > 0 {
