@@ -85,6 +85,7 @@ internal/
   mob/names.go          # random name generation (adjective-fruit)
   mob/integration_test.go
 Makefile                # build/install/test
+KNOWN_ISSUES.md         # tracked issues not yet fixed
 ```
 
 ## Data model
