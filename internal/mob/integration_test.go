@@ -1452,3 +1452,35 @@ func TestPurgeExternalMobs(t *testing.T) {
 		t.Errorf("expected 0 mobs after purge, got %d", len(mobs))
 	}
 }
+
+func TestSlashCommandsCopiedToExternalWorktree(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepoWithMobsDir(t, bin, repoPath, "2")
+
+	// given -> slash commands exist in the main repo's .claude/commands/
+	srcCommands := filepath.Join(repoPath, ".claude", "commands")
+	expectedFiles := []string{
+		"mob-list.md", "mob-new.md", "mob-switch.md", "mob-remove.md", "mob-drop.md",
+		"codemob-list.md", "codemob-new.md", "codemob-switch.md", "codemob-remove.md", "codemob-drop.md",
+	}
+	for _, name := range expectedFiles {
+		if _, err := os.Stat(filepath.Join(srcCommands, name)); err != nil {
+			t.Fatalf("precondition: slash command %s missing from main repo: %v", name, err)
+		}
+	}
+
+	// when -> create a mob (worktree will be external)
+	runCore(t, bin, repoPath, "new", "cmd-test", "--no-launch")
+
+	repoName := filepath.Base(repoPath)
+	worktreePath := filepath.Join(filepath.Dir(repoPath), ".codemob", repoName, "mobs", "cmd-test")
+
+	// then -> slash commands should exist in the worktree's .claude/commands/
+	destCommands := filepath.Join(worktreePath, ".claude", "commands")
+	for _, name := range expectedFiles {
+		if _, err := os.Stat(filepath.Join(destCommands, name)); err != nil {
+			t.Errorf("slash command %s not copied to worktree: %v", name, err)
+		}
+	}
+}

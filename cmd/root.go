@@ -289,6 +289,8 @@ func createMob(root string, cfg *mob.Config, name, agent string) (string, error)
 		return "", err
 	}
 
+	mob.CopySlashCommands(root, worktreePath)
+
 	cfg.Mobs = append(cfg.Mobs, mob.Mob{
 		Name:      name,
 		Branch:    branch,

@@ -590,6 +590,27 @@ func setupClaudeCommands(repoRoot string, multipleAgents bool) {
 	}
 }
 
+func CopySlashCommands(srcRoot, destRoot string) {
+	srcDir := filepath.Join(srcRoot, ".claude", "commands")
+	destDir := filepath.Join(destRoot, ".claude", "commands")
+
+	for _, prefix := range []string{"mob-", "codemob-"} {
+		matches, _ := filepath.Glob(filepath.Join(srcDir, prefix+"*.md"))
+		if len(matches) == 0 {
+			continue
+		}
+		os.MkdirAll(destDir, 0755)
+		for _, src := range matches {
+			data, err := os.ReadFile(src)
+			if err != nil {
+				continue
+			}
+			dest := filepath.Join(destDir, filepath.Base(src))
+			os.WriteFile(dest, data, 0644)
+		}
+	}
+}
+
 func setupCodexPrompts(multipleAgents bool) {
 	promptsDir := filepath.Join(os.Getenv("HOME"), ".codex", "prompts")
 	os.MkdirAll(promptsDir, 0755)
