@@ -94,6 +94,8 @@ Makefile                # build/install/test
 {
   "default_agent": "claude",
   "base_branch": "main",
+  "repo_root": "/Users/you/repos/android",
+  "mobs_dir": "/Users/you/repos/.codemob/android/mobs",
   "mobs": [
     {
       "name": "fix-auth-bug",
@@ -104,6 +106,8 @@ Makefile                # build/install/test
   ]
 }
 ```
+
+**Config stores explicit absolute paths.** Both `repo_root` and `mobs_dir` are always set to absolute paths during init. If reality diverges (repo moved, mobs dir deleted), codemob fails with a hard error telling the user to reinit. This is intentional - we accept that repo moves require reinit rather than adding dynamic resolution or fallback logic.
 
 `.codemob/queue.json` (transient, written by slash commands):
 ```json
