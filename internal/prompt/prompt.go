@@ -43,7 +43,7 @@ func ReadLine(fallback string) (string, error) {
 			return "", ErrCancelled
 
 		case b[0] == 0x1b:
-			if isStandaloneEsc(fd) {
+			if isStandaloneEsc() {
 				fmt.Print("\r\n")
 				return "", ErrCancelled
 			}
@@ -63,6 +63,7 @@ func ReadLine(fallback string) (string, error) {
 
 		case b[0] >= 0x80:
 			consumeUTF8Continuation(b[0])
+			fmt.Print("\a")
 
 		case b[0] >= 0x20 && b[0] < 0x7f:
 			buf = append(buf, b[0])
@@ -86,7 +87,11 @@ func Confirm(defaultYes bool) (bool, error) {
 // isStandaloneEsc reads ahead after an ESC byte to determine if it's a standalone
 // ESC press (cancel) or the start of an escape sequence (arrow keys, etc.).
 // Returns true if ESC is standalone, false if it's part of a sequence (consumed and discarded).
-func isStandaloneEsc(fd int) bool {
+//
+// Note: when the timeout fires (standalone ESC), the reader goroutine remains blocked on
+// os.Stdin.Read and will swallow the next byte that arrives. This is safe because the
+// cancel path exits cleanly without further stdin reads.
+func isStandaloneEsc() bool {
 	ch := make(chan byte, 1)
 	go func() {
 		b := make([]byte, 1)
@@ -102,7 +107,7 @@ func isStandaloneEsc(fd int) bool {
 			return true
 		}
 		if next == '[' || next == 'O' {
-			drainSequence(fd, ch)
+			drainSequence(ch)
 		}
 		return false
 	case <-time.After(50 * time.Millisecond):
@@ -111,7 +116,7 @@ func isStandaloneEsc(fd int) bool {
 }
 
 // drainSequence consumes the remaining bytes of a CSI or SS3 escape sequence.
-func drainSequence(fd int, ch chan byte) {
+func drainSequence(ch chan byte) {
 	for {
 		var next byte
 		var ok bool
@@ -129,7 +134,6 @@ func drainSequence(fd int, ch chan byte) {
 			next = b[0]
 		}
 
-		// CSI sequences end with a byte in the 0x40-0x7E range
 		if next >= 0x40 && next <= 0x7E {
 			return
 		}

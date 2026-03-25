@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -194,6 +195,10 @@ func pickMob(cfg *mob.Config, opts pickerOpts) (string, error) {
 	}
 
 	name, err := prompt.ReadLine(opts.defaultVal)
+	if errors.Is(err, prompt.ErrCancelled) {
+		fmt.Println("Cancelled.")
+		return "", err
+	}
 	if err != nil {
 		return "", err
 	}
