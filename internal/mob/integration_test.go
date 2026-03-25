@@ -74,7 +74,7 @@ func initRepo(t *testing.T, bin, repoPath string) {
 	t.Helper()
 	cmd := exec.Command(bin, "init")
 	cmd.Dir = repoPath
-	cmd.Stdin = strings.NewReader("main\nclaude\n")
+	cmd.Stdin = strings.NewReader("y\n")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("init failed: %s\n%s", err, out)
