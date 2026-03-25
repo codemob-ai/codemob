@@ -35,7 +35,7 @@ Start a new session - codemob creates an isolated workspace and drops you into y
 ```bash
 ❯ claude --new-codemob
 
-  ● codemob  Created mob 'wild-kumquat' on branch mob/wild-kumquat
+  【●】codemob  Created mob 'wild-kumquat' on branch mob/wild-kumquat
 
  ▐▛███▜▌   Claude Code
 ▝▜█████▛▘
@@ -57,18 +57,21 @@ Need another session? Create one without leaving Claude:
 
 ❯ auto
 
-⏺ New mob queued. Exit (Ctrl+C) and codemob will create and launch it.
+⏺ This will end our current conversation. codemob will automatically
+  close this session and launch the new one. Are you sure?
 
-^C
+❯ yes
 
-  ● codemob  Created mob 'epic-apricot' on branch mob/epic-apricot
+  【●】codemob  Session ended - mob 'wild-kumquat'
+
+  【●】codemob  Created mob 'epic-apricot' on branch mob/epic-apricot
 
  ▐▛███▜▌   Claude Code
 ▝▜█████▛▘
   ▘▘ ▝▝    ~/my-project/.codemob/mobs/epic-apricot
 ```
 
-Switch between sessions - `/mob-switch`, pick one, exit, done:
+Switch between sessions - `/mob-switch`, pick one, done:
 
 ```bash
  ▐▛███▜▌   Claude Code
@@ -85,11 +88,14 @@ Switch between sessions - `/mob-switch`, pick one, exit, done:
 
 ❯ 1
 
-⏺ Switch queued. Exit (Ctrl+C) and codemob launches the next session.
+⏺ This will end our current conversation. codemob will automatically
+  close this session and launch the new one. Are you sure?
 
-^C
+❯ yes
 
-  ● codemob  Switching to mob 'wild-kumquat'
+  【●】codemob  Session ended - mob 'epic-apricot'
+
+  【●】codemob  Switching to mob 'wild-kumquat'
 
  ▐▛███▜▌   Claude Code
 ▝▜█████▛▘
@@ -110,11 +116,14 @@ Swap the agent on the fly - go from Claude to Codex (or back) on the same worksp
 
 ❯ yes
 
-⏺ Agent switch queued. Exit (Ctrl+C).
+⏺ This will end our current conversation. codemob will automatically
+  close this session and launch the new one. Are you sure?
 
-^C
+❯ yes
 
-  ● codemob  Switching mob 'wild-kumquat' to agent 'codex'
+  【●】codemob  Session ended - mob 'wild-kumquat'
+
+  【●】codemob  Switching mob 'wild-kumquat' to agent 'codex'
 
 ╭──────────────────────────────────────────────────────╮
 │ >_ OpenAI Codex                                      │
@@ -196,7 +205,7 @@ No patches, no plugins, no monkey-patching. Just a shell function pretending to 
 
 ## Under the hood
 
-【🌕】Each mob is a git worktree under `.codemob/mobs/`. Agents are launched as child processes. When you queue a switch from inside an agent (via slash command), codemob picks it up after exit and launches the next session.
+【🌕】Each mob is a git worktree under `.codemob/mobs/`. Agents are launched as child processes. When you queue an action from inside an agent (via slash command), codemob detects it, terminates the agent, and launches the next session automatically.
 
 Git is the source of truth. Stale metadata gets cleaned up automatically.
 
