@@ -21,6 +21,16 @@ const triggerGuard = "IMPORTANT: Only invoke this command when the user explicit
 	"\"mob\" or \"codemob\". Generic requests like \"list\", \"create\", " +
 	"\"remove\", or \"switch\" without mentioning mob/codemob should NOT trigger this.\n\n"
 
+const confirmationGuardLaunch = `IMPORTANT: Before running the codemob queue command, you MUST get explicit confirmation from the user. Tell them: "This will end our current conversation. codemob will automatically close this session and launch the new one. Are you sure?"
+
+Only run the queue command after the user confirms. If they decline, cancel the operation.
+`
+
+const confirmationGuardExit = `IMPORTANT: Before running the codemob queue command, you MUST get explicit confirmation from the user. Tell them: "This will end our current conversation and close this session. Are you sure?"
+
+Only run the queue command after the user confirms. If they decline, cancel the operation.
+`
+
 var slashCommandDefs = map[string]commandDef{
 	"list": {
 		Description: "List all codemob workspaces and their status",
@@ -29,7 +39,7 @@ var slashCommandDefs = map[string]commandDef{
 	},
 	"new": {
 		Description: "Create a new codemob workspace",
-		Body: triggerGuard + `Ask the user if they want to provide a name or have one auto-generated.
+		Body: triggerGuard + confirmationGuardLaunch + `Ask the user if they want to provide a name or have one auto-generated.
 
 If they provide a name, validate it against these rules before running the command:
 - Only letters (a-z, A-Z), numbers, and hyphens allowed (no spaces or special characters)
@@ -44,32 +54,26 @@ If the name is valid, run: ` + "`codemob queue new <name>`" + ` (replace ` + "`<
 If they want auto-generated, run: ` + "`codemob queue new`" + ` (no name argument — codemob generates one).
 
 Do NOT generate a name yourself — codemob handles name generation.
-
-Then tell the user: "New mob queued. Exit this session (Ctrl+C) and codemob will automatically create and launch the new mob."
 `,
 	},
 	"switch": {
 		Description: "Switch to a different codemob workspace",
-		Body: triggerGuard + `Run ` + "`codemob list-others`" + ` using the Bash tool.
+		Body: triggerGuard + confirmationGuardLaunch + `Run ` + "`codemob list-others`" + ` using the Bash tool.
 
 If the output says "No mobs", tell the user there are no other mobs to switch to and suggest using /mob-new or /codemob-new to create one.
 
 Otherwise, display the results and ask the user which mob they want to switch to.
 
 Once they pick one, run ` + "`codemob queue switch <name>`" + ` using the Bash tool (replace ` + "`<name>`" + ` with the chosen mob name).
-
-Then tell the user: "Switch queued. Exit this session (Ctrl+C) and codemob will automatically launch the new mob."
 `,
 	},
 	"change-agent": {
 		Description: "Switch the current mob to a different AI agent",
-		Body: triggerGuard + `codemob supports claude and codex out of the box.
+		Body: triggerGuard + confirmationGuardLaunch + `codemob supports claude and codex out of the box.
 
 Determine the current agent by checking which tool you are (claude or codex). Offer the OTHER agent — do not suggest the one already running.
 
-Once the user confirms, run ` + "`codemob queue change-agent <agent>`" + ` using the Bash tool (replace ` + "`<agent>`" + ` with the chosen agent name).
-
-Then tell the user: "Agent switch queued. Exit this session (Ctrl+C) and codemob will relaunch with the new agent."
+Once the user confirms which agent they want, run ` + "`codemob queue change-agent <agent>`" + ` using the Bash tool (replace ` + "`<agent>`" + ` with the chosen agent name).
 `,
 	},
 	"remove": {
@@ -78,22 +82,23 @@ Then tell the user: "Agent switch queued. Exit this session (Ctrl+C) and codemob
 
 Ask the user which mob they want to remove.
 
-If they choose a DIFFERENT mob (not the one marked with ◀), run ` + "`codemob remove <name>`" + ` directly.
+If they choose a DIFFERENT mob (not the one marked with ◀), run ` + "`codemob remove <name>`" + ` directly. No session confirmation needed since the current session stays alive.
 
-If they choose the CURRENT mob (marked with ◀), run this exact command:
+If they choose the CURRENT mob (marked with ◀):
+
+` + confirmationGuardExit + `
+Run this exact command:
 
 ` + "```" + `
 codemob queue remove "$CODEMOB_MOB"
 ` + "```" + `
 
 $CODEMOB_MOB is already set in your environment. There is no need to echo it - the command above will resolve it automatically.
-
-Then tell the user: "Removal queued. Exit this session (Ctrl+C) and codemob will remove the mob."
 `,
 	},
 	"drop": {
 		Description: "Remove the current codemob workspace and exit",
-		Body: triggerGuard + `Run this exact command using the Bash tool:
+		Body: triggerGuard + confirmationGuardExit + `Run this exact command using the Bash tool:
 
 ` + "```" + `
 codemob queue remove "$CODEMOB_MOB"
@@ -102,8 +107,6 @@ codemob queue remove "$CODEMOB_MOB"
 $CODEMOB_MOB is already set in your environment. There is no need to echo it - the command above will resolve it automatically.
 
 If the command fails, tell the user: "This command can only be used from within a codemob workspace." and stop.
-
-Otherwise, tell the user: "Mob queued for removal. Exit this session (Ctrl+C) and codemob will remove it."
 `,
 	},
 }
