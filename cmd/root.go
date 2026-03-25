@@ -626,7 +626,7 @@ func cmdPurge(_ []string) error {
 		fmt.Printf("  %s✗%s Removed '%s'\n", r, rst, m.Name)
 	}
 
-	mob.CleanupExternalMobsDir(cfg.MobsDirPath)
+	mob.CleanupExternalMobsDir(root, cfg.MobsDirPath)
 
 	cfg.Mobs = nil
 	if err := mob.SaveConfig(root, cfg); err != nil {

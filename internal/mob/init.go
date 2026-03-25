@@ -754,7 +754,7 @@ func Uninstall(installDir string) error {
 			}
 		}
 		if cfg != nil {
-			CleanupExternalMobsDir(cfg.MobsDirPath)
+			CleanupExternalMobsDir(repoRoot, cfg.MobsDirPath)
 		}
 		// Remove .codemob/ directory
 		os.RemoveAll(filepath.Join(repoRoot, CodemobDir))

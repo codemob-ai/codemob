@@ -98,6 +98,14 @@ func insideWorktreeEx() (mainRoot, toplevel string) {
 
 	mainRoot = filepath.Dir(commonDir)
 
+	// Resolve symlinks before comparing (macOS /var -> /private/var, etc.)
+	if resolved, err := filepath.EvalSymlinks(mainRoot); err == nil {
+		mainRoot = resolved
+	}
+	if resolved, err := filepath.EvalSymlinks(toplevel); err == nil {
+		toplevel = resolved
+	}
+
 	// If toplevel == mainRoot, we're in the main repo, not a worktree
 	if toplevel == mainRoot {
 		return "", toplevel
@@ -240,9 +248,9 @@ func currentMobNameFromCwd(knownRoot string) string {
 }
 
 // CleanupExternalMobsDir removes an external mobs directory and its empty parent directories.
-// Uses os.Remove (not RemoveAll) for parents so only empty dirs are removed.
-func CleanupExternalMobsDir(mobsDirPath string) {
-	if mobsDirPath == "" {
+// Skips cleanup if the path is inside repoRoot (project-dir mode).
+func CleanupExternalMobsDir(repoRoot, mobsDirPath string) {
+	if mobsDirPath == "" || strings.HasPrefix(mobsDirPath, repoRoot+"/") {
 		return
 	}
 	os.RemoveAll(mobsDirPath)
