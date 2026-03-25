@@ -273,6 +273,16 @@ func FindMob(cfg *Config, name string) *Mob {
 }
 
 
+// ActualBranch returns the current branch of a mob's worktree.
+// Falls back to the config-stored branch if the worktree can't be read.
+func ActualBranch(repoRoot string, cfg *Config, m *Mob) string {
+	worktreePath := MobPath(repoRoot, cfg, m.Name)
+	if branch, err := gitutil.CurrentBranch(worktreePath); err == nil {
+		return branch
+	}
+	return m.Branch
+}
+
 // RelativeTime formats a timestamp as a human-readable relative time.
 func RelativeTime(timestamp string) string {
 	t, err := time.Parse(time.RFC3339, timestamp)
