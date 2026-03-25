@@ -1,7 +1,6 @@
 package mob
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,6 +9,7 @@ import (
 	"strings"
 
 	gitutil "github.com/codemob-ai/codemob/internal/git"
+	"github.com/codemob-ai/codemob/internal/prompt"
 )
 
 type commandDef struct {
@@ -191,11 +191,8 @@ func Init(installDir string, forceReprompt bool) error {
 	fmt.Printf("  All of this can be easily reverted with: %scodemob uninstall%s\n", green, reset)
 	fmt.Println()
 	fmt.Print("Continue? [Y/n]: ")
-
-	reader := bufio.NewReader(os.Stdin)
-	input, _ := reader.ReadString('\n')
-	input = strings.TrimSpace(strings.ToLower(input))
-	if input == "n" || input == "no" {
+	ok, err := prompt.Confirm(true)
+	if err != nil || !ok {
 		fmt.Println("Cancelled.")
 		return nil
 	}
@@ -668,19 +665,22 @@ func setupRepo(reprompt bool) string {
 		return root
 	}
 
-	reader := bufio.NewReader(os.Stdin)
 	fmt.Println()
 	fmt.Printf("Base branch for new mobs [%s]: ", cfg.BaseBranch)
-	input, _ := reader.ReadString('\n')
-	if v := strings.TrimSpace(input); v != "" {
-		cfg.BaseBranch = v
+	input, err := prompt.ReadLine(cfg.BaseBranch)
+	if err != nil {
+		fmt.Println("Cancelled.")
+		return ""
 	}
+	cfg.BaseBranch = input
 
 	fmt.Printf("Default agent (claude/codex) [%s]: ", cfg.DefaultAgent)
-	input, _ = reader.ReadString('\n')
-	if v := strings.TrimSpace(input); v != "" {
-		cfg.DefaultAgent = v
+	input, err = prompt.ReadLine(cfg.DefaultAgent)
+	if err != nil {
+		fmt.Println("Cancelled.")
+		return ""
 	}
+	cfg.DefaultAgent = input
 
 	// Mobs directory prompt
 	repoName := filepath.Base(root)
@@ -702,10 +702,10 @@ func setupRepo(reprompt bool) string {
 	fmt.Printf("  2) Enclosing dir  %s/\n", enclosingPath)
 	fmt.Printf("  3) Global dir     %s/\n", globalPath)
 	fmt.Printf("\nMobs directory [%s]: ", currentDefault)
-	input, _ = reader.ReadString('\n')
-	choice := strings.TrimSpace(input)
-	if choice == "" {
-		choice = currentDefault
+	choice, err := prompt.ReadLine(currentDefault)
+	if err != nil {
+		fmt.Println("Cancelled.")
+		return ""
 	}
 
 	oldMobsDir := cfg.MobsDirPath
@@ -724,8 +724,8 @@ func setupRepo(reprompt bool) string {
 		fmt.Println("  codemob will no longer track them, but the worktrees (and the linked git branches) will remain on disk.")
 		fmt.Println("  Run 'codemob purge' or 'codemob remove' first to clean them up.")
 		fmt.Print("\nContinue anyway? [y/N]: ")
-		input, _ = reader.ReadString('\n')
-		if v := strings.TrimSpace(strings.ToLower(input)); v != "y" && v != "yes" {
+		ok, err := prompt.Confirm(false)
+		if err != nil || !ok {
 			fmt.Println("Cancelled.")
 			return ""
 		}
@@ -780,11 +780,8 @@ func Uninstall(installDir string) error {
 	warn("codemob will stop working in ALL projects after this.")
 	fmt.Println()
 	fmt.Print("Are you sure? [y/N]: ")
-
-	reader := bufio.NewReader(os.Stdin)
-	input, _ := reader.ReadString('\n')
-	input = strings.TrimSpace(strings.ToLower(input))
-	if input != "y" && input != "yes" {
+	ok, err := prompt.Confirm(false)
+	if err != nil || !ok {
 		fmt.Println("Cancelled.")
 		return nil
 	}

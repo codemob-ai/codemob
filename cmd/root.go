@@ -14,6 +14,7 @@ import (
 
 	gitutil "github.com/codemob-ai/codemob/internal/git"
 	"github.com/codemob-ai/codemob/internal/mob"
+	"github.com/codemob-ai/codemob/internal/prompt"
 )
 
 func brandPrefix(color string) string {
@@ -192,10 +193,9 @@ func pickMob(cfg *mob.Config, opts pickerOpts) (string, error) {
 		fmt.Fprint(out, "\nWhich mob? (#/name): ")
 	}
 
-	var name string
-	fmt.Scanln(&name)
-	if name == "" {
-		name = opts.defaultVal
+	name, err := prompt.ReadLine(opts.defaultVal)
+	if err != nil {
+		return "", err
 	}
 	if name == "" {
 		return "", fmt.Errorf("no mob selected")
@@ -557,9 +557,8 @@ func cmdRemove(args []string) error {
 	if !force {
 		fmt.Fprintf(os.Stderr, "  \033[33m!\033[0m This will permanently delete mob '%s'. Uncommitted/unpushed changes will be lost.\n", m.Name)
 		fmt.Fprint(os.Stderr, "  Continue? [y/N]: ")
-		var input string
-		fmt.Scanln(&input)
-		if input != "y" && input != "Y" && input != "yes" {
+		ok, err := prompt.Confirm(false)
+		if err != nil || !ok {
 			fmt.Println("Cancelled.")
 			return nil
 		}
@@ -621,9 +620,8 @@ func cmdPurge(_ []string) error {
 	fmt.Printf("  %sThis cannot be undone.%s\n", r, rst)
 	fmt.Print("\n  Are you sure? [y/N]: ")
 
-	var input string
-	fmt.Scanln(&input)
-	if input != "y" && input != "yes" {
+	ok, err := prompt.Confirm(false)
+	if err != nil || !ok {
 		fmt.Println("  Cancelled.")
 		return nil
 	}
@@ -771,9 +769,8 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 		}
 		fmt.Fprintf(os.Stderr, "\n  \033[33m!\033[0m This will permanently delete mob '%s'. Uncommitted/unpushed changes will be lost.\n", m.Name)
 		fmt.Fprint(os.Stderr, "  Continue? [y/N]: ")
-		var input string
-		fmt.Scanln(&input)
-		if input != "y" && input != "Y" && input != "yes" {
+		ok, err := prompt.Confirm(false)
+		if err != nil || !ok {
 			fmt.Println("  Cancelled.")
 			return "", "", false, nil
 		}
