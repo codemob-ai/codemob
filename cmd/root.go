@@ -923,7 +923,7 @@ func runAgent(root, agent, workdir string, resume bool) error {
 	}
 
 	if resume {
-		err := spawnAgent(binPath, resumeArgs, workdir)
+		err := spawnAgent(root, binPath, resumeArgs, workdir)
 		if err == nil {
 			return nil
 		}
@@ -936,7 +936,7 @@ func runAgent(root, agent, workdir string, resume bool) error {
 		mobStatus("No previous session found, starting new session")
 	}
 
-	return spawnAgent(binPath, newArgs, workdir)
+	return spawnAgent(root, binPath, newArgs, workdir)
 }
 
 func cmdInjectArgs(args []string) error {
@@ -996,7 +996,7 @@ func agentArgs(agent, repoRoot string) (binPath string, resumeArgs, newArgs []st
 	return
 }
 
-func spawnAgent(binPath string, args []string, workdir string) error {
+func spawnAgent(root, binPath string, args []string, workdir string) error {
 	cmd := exec.Command(binPath, args...)
 	cmd.Dir = workdir
 	cmd.Stdin = os.Stdin
@@ -1004,10 +1004,15 @@ func spawnAgent(binPath string, args []string, workdir string) error {
 	cmd.Stderr = os.Stderr
 	cmd.Env = append(os.Environ(), "CODEMOB_MOB="+filepath.Base(workdir))
 
-	// Forward signals to child, clean up goroutine on exit
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	done := make(chan struct{})
+
+	// Forward signals to child
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
-	done := make(chan struct{})
 	go func() {
 		select {
 		case sig := <-sigCh:
@@ -1018,7 +1023,30 @@ func spawnAgent(binPath string, args []string, workdir string) error {
 		}
 	}()
 
-	err := cmd.Run()
+	// Watch for queue.json - auto-terminate agent when a queued action appears
+	if root != "" {
+		queuePath := mob.QueueFilePath(root)
+		go func() {
+			ticker := time.NewTicker(500 * time.Millisecond)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					if _, err := os.Stat(queuePath); err == nil {
+						mobStatus("Stopping agent...")
+						if cmd.Process != nil {
+							cmd.Process.Signal(syscall.SIGTERM)
+						}
+						return
+					}
+				case <-done:
+					return
+				}
+			}
+		}()
+	}
+
+	err := cmd.Wait()
 	signal.Stop(sigCh)
 	close(done)
 	return err

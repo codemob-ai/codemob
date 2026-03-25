@@ -21,6 +21,11 @@ const triggerGuard = "IMPORTANT: Only invoke this command when the user explicit
 	"\"mob\" or \"codemob\". Generic requests like \"list\", \"create\", " +
 	"\"remove\", or \"switch\" without mentioning mob/codemob should NOT trigger this.\n\n"
 
+const confirmationGuard = `IMPORTANT: Before running the codemob queue command, you MUST get explicit confirmation from the user. Tell them: "This will end our current conversation. codemob will automatically close this session and launch the new one. Are you sure?"
+
+Only run the queue command after the user confirms. If they decline, cancel the operation.
+`
+
 var slashCommandDefs = map[string]commandDef{
 	"list": {
 		Description: "List all codemob workspaces and their status",
@@ -45,8 +50,7 @@ If they want auto-generated, run: ` + "`codemob queue new`" + ` (no name argumen
 
 Do NOT generate a name yourself — codemob handles name generation.
 
-Then tell the user: "New mob queued. Exit this session (Ctrl+C) and codemob will automatically create and launch the new mob."
-`,
+` + confirmationGuard,
 	},
 	"switch": {
 		Description: "Switch to a different codemob workspace",
@@ -58,8 +62,7 @@ Otherwise, display the results and ask the user which mob they want to switch to
 
 Once they pick one, run ` + "`codemob queue switch <name>`" + ` using the Bash tool (replace ` + "`<name>`" + ` with the chosen mob name).
 
-Then tell the user: "Switch queued. Exit this session (Ctrl+C) and codemob will automatically launch the new mob."
-`,
+` + confirmationGuard,
 	},
 	"change-agent": {
 		Description: "Switch the current mob to a different AI agent",
@@ -67,10 +70,9 @@ Then tell the user: "Switch queued. Exit this session (Ctrl+C) and codemob will 
 
 Determine the current agent by checking which tool you are (claude or codex). Offer the OTHER agent — do not suggest the one already running.
 
-Once the user confirms, run ` + "`codemob queue change-agent <agent>`" + ` using the Bash tool (replace ` + "`<agent>`" + ` with the chosen agent name).
+Once the user confirms which agent they want, run ` + "`codemob queue change-agent <agent>`" + ` using the Bash tool (replace ` + "`<agent>`" + ` with the chosen agent name).
 
-Then tell the user: "Agent switch queued. Exit this session (Ctrl+C) and codemob will relaunch with the new agent."
-`,
+` + confirmationGuard,
 	},
 	"remove": {
 		Description: "Remove a codemob workspace",
@@ -78,7 +80,7 @@ Then tell the user: "Agent switch queued. Exit this session (Ctrl+C) and codemob
 
 Ask the user which mob they want to remove.
 
-If they choose a DIFFERENT mob (not the one marked with ◀), run ` + "`codemob remove <name>`" + ` directly.
+If they choose a DIFFERENT mob (not the one marked with ◀), run ` + "`codemob remove <name>`" + ` directly. No session confirmation needed since the current session stays alive.
 
 If they choose the CURRENT mob (marked with ◀), run this exact command:
 
@@ -88,8 +90,7 @@ codemob queue remove "$CODEMOB_MOB"
 
 $CODEMOB_MOB is already set in your environment. There is no need to echo it - the command above will resolve it automatically.
 
-Then tell the user: "Removal queued. Exit this session (Ctrl+C) and codemob will remove the mob."
-`,
+` + confirmationGuard,
 	},
 	"drop": {
 		Description: "Remove the current codemob workspace and exit",
@@ -103,8 +104,7 @@ $CODEMOB_MOB is already set in your environment. There is no need to echo it - t
 
 If the command fails, tell the user: "This command can only be used from within a codemob workspace." and stop.
 
-Otherwise, tell the user: "Mob queued for removal. Exit this session (Ctrl+C) and codemob will remove it."
-`,
+` + confirmationGuard,
 	},
 }
 

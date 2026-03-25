@@ -52,6 +52,11 @@ func ReadQueuedAction(repoRoot string) (*QueuedAction, error) {
 	return &action, nil
 }
 
+// QueueFilePath returns the absolute path to the queue file.
+func QueueFilePath(repoRoot string) string {
+	return filepath.Join(repoRoot, queueFile)
+}
+
 // ClearQueue removes the queued action file.
 func ClearQueue(repoRoot string) {
 	os.Remove(filepath.Join(repoRoot, queueFile))
