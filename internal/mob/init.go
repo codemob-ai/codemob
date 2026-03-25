@@ -612,12 +612,13 @@ func setupRepo(reprompt bool) string {
 		}
 	}
 
-	if !isNew && !reprompt {
+	fullyConfigured := cfg.RepoRoot != ""
+
+	if !isNew && !reprompt && fullyConfigured {
 		info(fmt.Sprintf("Repo already initialized at %s", root))
 		return root
 	}
 
-	// Prompt
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Println()
 	fmt.Printf("Base branch for new mobs [%s]: ", cfg.BaseBranch)
@@ -669,7 +670,10 @@ func setupRepo(reprompt bool) string {
 	}
 
 	if !isNew && oldMobsDir != cfg.MobsDirPath && len(cfg.Mobs) > 0 {
-		warn("Existing mobs remain at their current location. New mobs will use the new directory.")
+		fmt.Println()
+		errMsg(fmt.Sprintf("You have %d existing mob(s) at the old location.", len(cfg.Mobs)))
+		fmt.Println("  They will be orphaned and removed from config on the next operation.")
+		fmt.Println("  Consider running 'codemob purge' first, or keep the current directory.")
 	}
 
 	if resolved, err := filepath.EvalSymlinks(root); err == nil {
