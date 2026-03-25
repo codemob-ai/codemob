@@ -666,7 +666,7 @@ func setupRepo(reprompt bool) string {
 	case "3":
 		cfg.MobsDirPath = globalPath
 	default:
-		cfg.MobsDirPath = ""
+		cfg.MobsDirPath = filepath.Join(root, MobsDir)
 	}
 
 	if !isNew && oldMobsDir != cfg.MobsDirPath && len(cfg.Mobs) > 0 {

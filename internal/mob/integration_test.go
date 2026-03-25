@@ -1327,24 +1327,25 @@ func TestMobsDirGlobal(t *testing.T) {
 	}
 }
 
-func TestMobsDirBackwardCompat(t *testing.T) {
+func TestMobsDirProjectDefault(t *testing.T) {
 	bin := buildCore(t)
 	_, repoPath := setupTestRepo(t)
 	initRepo(t, bin, repoPath)
 
-	// given -> config has no mobs_dir (backward compat)
+	// given -> config should have mobs_dir set to the project path
 	cfg := readConfig(t, repoPath)
-	if _, ok := cfg["mobs_dir"]; ok {
-		t.Error("expected no mobs_dir in config for default init")
+	mobsDir, _ := cfg["mobs_dir"].(string)
+	if mobsDir == "" || !strings.HasSuffix(mobsDir, ".codemob/mobs") {
+		t.Errorf("expected mobs_dir ending in .codemob/mobs, got %v", cfg["mobs_dir"])
 	}
 
 	// when -> create a mob
-	runCore(t, bin, repoPath, "new", "compat-test", "--no-launch")
+	runCore(t, bin, repoPath, "new", "default-test", "--no-launch")
 
-	// then -> worktree should be at the project-dir default
-	worktreePath := filepath.Join(repoPath, ".codemob", "mobs", "compat-test")
+	// then -> worktree should be at the project-dir path
+	worktreePath := filepath.Join(mobsDir, "default-test")
 	if _, err := os.Stat(worktreePath); err != nil {
-		t.Errorf("worktree not at default project path: %v", err)
+		t.Errorf("worktree not at project path: %v", err)
 	}
 }
 

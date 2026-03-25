@@ -33,7 +33,6 @@ type Config struct {
 }
 
 // MobsPath returns the absolute path to the mobs directory.
-// If MobsDirPath is set, it's used directly; otherwise falls back to <repoRoot>/.codemob/mobs.
 func MobsPath(repoRoot string, cfg *Config) string {
 	if cfg != nil && cfg.MobsDirPath != "" {
 		return cfg.MobsDirPath
