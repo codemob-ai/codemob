@@ -54,7 +54,18 @@ List each issue with:
 - **What's wrong** and **why it matters** - be specific
 - **Suggested fix** if you have one
 
+Before finalizing your issues list, re-read each `suggestion` and `concern` and ask yourself: "Would a pragmatic senior engineer consider this overengineering for the current stage and scope of the project?" If the answer is yes - if the suggestion adds complexity, abstraction, or defensive code that isn't justified by a concrete present-day problem - drop it. Only keep suggestions where the cost of NOT doing it is real and near-term.
+
 ### Unification opportunities
 If you found duplicated logic or missed reuse opportunities, list them here.
+
+### Merge confidence
+Rate 1-5 with a one-line justification:
+
+- **5 - Ship it** - No issues found, or only trivial suggestions. Merge without hesitation.
+- **4 - Looks good** - Minor suggestions that are nice-to-have but not worth blocking on. Merge, optionally address in a follow-up.
+- **3 - Probably fine** - Has concerns that deserve a second look. Author should review the feedback and make a judgement call - could go either way.
+- **2 - Needs work** - Has issues that should be fixed before merging. Nothing catastrophic, but the code isn't ready as-is.
+- **1 - Do not merge** - Has bugs, regressions, or fundamental design problems that will cause real damage if shipped.
 
 If the code looks good, say so. Don't manufacture issues to seem thorough.
