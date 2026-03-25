@@ -769,7 +769,8 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 		if m == nil {
 			return "", "", false, fmt.Errorf("mob '%s' not found", name)
 		}
-		fmt.Fprintf(os.Stderr, "\n  \033[33m!\033[0m This will permanently delete mob '%s'. Uncommitted/unpushed changes will be lost.\n", m.Name)
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintf(os.Stderr, "  \033[33m!\033[0m This will permanently delete mob '%s'. Uncommitted/unpushed changes will be lost.\n", m.Name)
 		fmt.Fprint(os.Stderr, "  Continue? [y/N]: ")
 		var input string
 		fmt.Scanln(&input)
@@ -1024,7 +1025,7 @@ func spawnAgent(root, binPath string, args []string, workdir string) error {
 	}()
 
 	// Watch for queue.json - auto-terminate agent when a queued action appears
-	if root != "" {
+	if root != "" && filepath.IsAbs(root) {
 		queuePath := mob.QueueFilePath(root)
 		go func() {
 			ticker := time.NewTicker(500 * time.Millisecond)
