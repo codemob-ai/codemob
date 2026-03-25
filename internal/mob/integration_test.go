@@ -440,7 +440,7 @@ func TestRemoveMob(t *testing.T) {
 	runCore(t, bin, repoPath, "new", "remove-me", "--no-launch")
 
 	// when
-	out := runCore(t, bin, repoPath, "remove", "remove-me")
+	out := runCore(t, bin, repoPath, "remove", "remove-me", "--force")
 
 	// then
 	if !strings.Contains(out, "Removed") {
@@ -620,7 +620,7 @@ func TestRemoveByIndex(t *testing.T) {
 	runCore(t, bin, repoPath, "new", "second", "--no-launch")
 
 	// when -> remove by index
-	runCore(t, bin, repoPath, "remove", "1")
+	runCore(t, bin, repoPath, "remove", "1", "--force")
 
 	// then -> only second remains
 	cfg := readConfig(t, repoPath)
@@ -704,7 +704,7 @@ func TestRemoveCleansSessionFiles(t *testing.T) {
 	writeSessionFile(t, repoPath, "sess-c", "other")
 
 	// when -> remove target
-	runCore(t, bin, repoPath, "remove", "target")
+	runCore(t, bin, repoPath, "remove", "target", "--force")
 
 	// then -> session files for target should be gone
 	sessDir := filepath.Join(repoPath, ".codemob", "sessions")
@@ -946,7 +946,7 @@ func TestResumeIgnoresRemovedMobInSession(t *testing.T) {
 
 	// given -> session points to temp, but we remove it
 	writeSessionFile(t, repoPath, "sess-3", "temp")
-	runCore(t, bin, repoPath, "remove", "temp")
+	runCore(t, bin, repoPath, "remove", "temp", "--force")
 
 	// when -> resume with empty input (session mob is gone, only one mob left)
 	out, err := runCoreWithSession(t, bin, repoPath, "sess-3", "", "resume", "--no-launch")

@@ -552,6 +552,17 @@ func cmdRemove(args []string) error {
 		return fmt.Errorf("mob '%s' not found", name)
 	}
 
+	if !force {
+		fmt.Fprintf(os.Stderr, "  \033[33m!\033[0m This will permanently delete mob '%s'. Uncommitted/unpushed changes will be lost.\n", m.Name)
+		fmt.Fprint(os.Stderr, "  Continue? [y/N]: ")
+		var input string
+		fmt.Scanln(&input)
+		if input != "y" && input != "Y" && input != "yes" {
+			fmt.Println("Cancelled.")
+			return nil
+		}
+	}
+
 	if err := removeMob(root, cfg, m, force); err != nil {
 		return err
 	}
@@ -755,6 +766,14 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 		m := mob.FindMob(cfg, name)
 		if m == nil {
 			return "", "", false, fmt.Errorf("mob '%s' not found", name)
+		}
+		fmt.Fprintf(os.Stderr, "\n  \033[33m!\033[0m This will permanently delete mob '%s'. Uncommitted/unpushed changes will be lost.\n", m.Name)
+		fmt.Fprint(os.Stderr, "  Continue? [y/N]: ")
+		var input string
+		fmt.Scanln(&input)
+		if input != "y" && input != "Y" && input != "yes" {
+			fmt.Println("  Cancelled.")
+			return "", "", false, nil
 		}
 		if err := removeMob(root, cfg, m, true); err != nil {
 			return "", "", false, err
