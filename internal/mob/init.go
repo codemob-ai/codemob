@@ -31,7 +31,16 @@ var slashCommandDefs = map[string]commandDef{
 		Description: "Create a new codemob workspace",
 		Body: triggerGuard + `Ask the user if they want to provide a name or have one auto-generated.
 
-If they provide a name, run: ` + "`codemob queue new <name>`" + ` (replace ` + "`<name>`" + ` with their choice).
+If they provide a name, validate it against these rules before running the command:
+- Only letters (a-z, A-Z), numbers, and hyphens allowed (no spaces or special characters)
+- Cannot start or end with a hyphen
+- Cannot be purely numeric
+- Cannot be "root" (reserved)
+- Max 60 characters
+
+If the name is invalid, tell the user what's wrong and ask them to pick a different name. Do NOT pass an invalid name to codemob.
+
+If the name is valid, run: ` + "`codemob queue new <name>`" + ` (replace ` + "`<name>`" + ` with their choice).
 If they want auto-generated, run: ` + "`codemob queue new`" + ` (no name argument — codemob generates one).
 
 Do NOT generate a name yourself — codemob handles name generation.
