@@ -41,6 +41,8 @@ func setupTestRepo(t *testing.T) (string, string) {
 
 	tmpHome := t.TempDir()
 	t.Setenv("HOME", tmpHome)
+	t.Setenv("CODEMOB_MOB", "")
+	t.Setenv("CODEMOB_SESSION", "")
 
 	// Create a fake claude binary that satisfies checkDependencies:
 	//   --version → prints a version string
@@ -1217,6 +1219,8 @@ func TestNewMobNoCommits(t *testing.T) {
 	// given -> a repo with no commits
 	tmpHome := t.TempDir()
 	t.Setenv("HOME", tmpHome)
+	t.Setenv("CODEMOB_MOB", "")
+	t.Setenv("CODEMOB_SESSION", "")
 
 	stubDir := filepath.Join(tmpHome, "bin")
 	os.MkdirAll(stubDir, 0755)
