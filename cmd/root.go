@@ -264,6 +264,9 @@ func createMob(root string, cfg *mob.Config, name, agent string) (string, error)
 	}
 
 	branch := "mob/" + name
+	if gitutil.BranchExists(root, branch) {
+		return "", fmt.Errorf("branch '%s' already exists (leftover from a previous mob?). Run: git branch -D %s", branch, branch)
+	}
 	worktreePath := mob.MobPath(root, cfg, name)
 
 	p := mobProgress(fmt.Sprintf("Creating mob '%s'...", name))

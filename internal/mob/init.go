@@ -675,7 +675,7 @@ func setupRepo(reprompt bool) string {
 	if !isNew && oldMobsDir != cfg.MobsDirPath && len(cfg.Mobs) > 0 {
 		fmt.Println()
 		errMsg(fmt.Sprintf("You have %d existing mob(s) at the old location.", len(cfg.Mobs)))
-		fmt.Println("  codemob will no longer track them, but the worktrees will remain on disk.")
+		fmt.Println("  codemob will no longer track them, but the worktrees (and the linked git branches) will remain on disk.")
 		fmt.Println("  Run 'codemob purge' or 'codemob remove' first to clean them up.")
 		fmt.Print("\nContinue anyway? [y/N]: ")
 		input, _ = reader.ReadString('\n')

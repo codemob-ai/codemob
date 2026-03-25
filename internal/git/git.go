@@ -66,6 +66,11 @@ func WorktreeRemove(repoRoot, path string, force bool) error {
 	return nil
 }
 
+func BranchExists(repoRoot, branch string) bool {
+	_, err := runGit(repoRoot, "rev-parse", "--verify", branch)
+	return err == nil
+}
+
 func BranchDelete(repoRoot, branch string) {
 	_, _ = runGit(repoRoot, "branch", "-D", branch) // best-effort
 }
