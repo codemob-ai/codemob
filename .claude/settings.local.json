@@ -4,7 +4,19 @@
       "Bash(go build:*)",
       "Bash(go test:*)",
       "Bash(make build:*)",
-      "Bash(make test:*)"
+      "Bash(make test:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git stash:*)",
+      "Bash(git -C * add:*)",
+      "Bash(git -C * commit:*)",
+      "Bash(git -C * push:*)",
+      "Bash(git -C * log:*)",
+      "Bash(git -C * diff:*)",
+      "Bash(git -C * stash:*)"
     ]
   }
 }

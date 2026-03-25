@@ -607,6 +607,12 @@ func setupCodexPrompts(multipleAgents bool) {
 }
 
 func setupRepo(reprompt bool) string {
+	if mainRoot := InsideWorktree(); mainRoot != "" {
+		warn("You're inside a mob worktree.")
+		fmt.Println("  Run 'codemob cd root' to go back to the main repo, then try again.")
+		return ""
+	}
+
 	root, err := gitutil.RepoRoot()
 	if err != nil {
 		warn("Not inside a git repository. Skipping repo setup.")
@@ -730,7 +736,10 @@ func Uninstall(installDir string) error {
 	fmt.Println("  - Remove codemob entries from global gitignore")
 
 	// Check if we're in a codemob project
-	repoRoot, _ := gitutil.RepoRoot()
+	repoRoot := InsideWorktree()
+	if repoRoot == "" {
+		repoRoot, _ = gitutil.RepoRoot()
+	}
 	hasProject := repoRoot != "" && IsInitialized(repoRoot)
 	if hasProject {
 		fmt.Printf("  - Remove .codemob/ directory and all worktrees from %s\n", repoRoot)
