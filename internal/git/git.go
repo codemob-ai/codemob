@@ -75,6 +75,14 @@ func BranchDelete(repoRoot, branch string) {
 	_, _ = runGit(repoRoot, "branch", "-D", branch) // best-effort
 }
 
+func CurrentBranch(dir string) (string, error) {
+	out, err := runGit(dir, "rev-parse", "--abbrev-ref", "HEAD")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
+}
+
 func DetectDefaultBranch(repoRoot string) string {
 	out, err := runGit(repoRoot, "symbolic-ref", "refs/remotes/origin/HEAD")
 	if err != nil {

@@ -152,6 +152,7 @@ func resolveMob(cfg *mob.Config, nameOrIndex string) *mob.Mob {
 }
 
 type pickerOpts struct {
+	repoRoot   string   // repo root for resolving actual worktree branches
 	out        *os.File // output for table and prompt (default: os.Stdout)
 	markerName string   // mob name to mark with ◀ (e.g., last session mob)
 	defaultVal string   // pre-filled default shown in prompt bracket; enter selects it
@@ -178,7 +179,8 @@ func pickMob(cfg *mob.Config, opts pickerOpts) (string, error) {
 		if m.Name == opts.markerName {
 			marker = " ◀"
 		}
-		fmt.Fprintf(w, "%d\t%s%s\t%s\t%s\t%s\n", i+1, m.Name, marker, m.Branch, m.Agent, mob.RelativeTime(m.CreatedAt))
+		branch := mob.ActualBranch(opts.repoRoot, cfg, &m)
+		fmt.Fprintf(w, "%d\t%s%s\t%s\t%s\t%s\n", i+1, m.Name, marker, branch, m.Agent, mob.RelativeTime(m.CreatedAt))
 	}
 	w.Flush()
 
@@ -375,7 +377,7 @@ func cmdNew(args []string) error {
 }
 
 func cmdList(_ []string, excludeCurrent bool) error {
-	_, cfg, err := requireInit()
+	root, cfg, err := requireInit()
 	if err != nil {
 		return err
 	}
@@ -405,7 +407,8 @@ func cmdList(_ []string, excludeCurrent bool) error {
 		if m.Name == currentMob {
 			marker = " ◀"
 		}
-		fmt.Fprintf(w, "%d\t%s%s\t%s\t%s\t%s\n", i+1, m.Name, marker, m.Branch, m.Agent, mob.RelativeTime(m.CreatedAt))
+		branch := mob.ActualBranch(root, cfg, &m)
+		fmt.Fprintf(w, "%d\t%s%s\t%s\t%s\t%s\n", i+1, m.Name, marker, branch, m.Agent, mob.RelativeTime(m.CreatedAt))
 	}
 	w.Flush()
 	return nil
@@ -439,6 +442,7 @@ func cmdResume(args []string) error {
 		}
 		var err error
 		name, err = pickMob(cfg, pickerOpts{
+			repoRoot:   root,
 			markerName: lastMob,
 			defaultVal: lastMob,
 		})
@@ -494,6 +498,7 @@ func cmdOpen(args []string) error {
 		}
 		var err error
 		name, err = pickMob(cfg, pickerOpts{
+			repoRoot:   root,
 			markerName: lastMob,
 			defaultVal: lastMob,
 		})
@@ -542,7 +547,7 @@ func cmdRemove(args []string) error {
 	}
 
 	if name == "" {
-		picked, err := pickMob(cfg, pickerOpts{})
+		picked, err := pickMob(cfg, pickerOpts{repoRoot: root})
 		if err != nil {
 			return err
 		}
@@ -674,6 +679,7 @@ func cmdPath(args []string) error {
 		inMob := mob.CurrentMobName() != ""
 		var err error
 		name, err = pickMob(cfg, pickerOpts{
+			repoRoot: root,
 			out:      os.Stderr,
 			showRoot: inMob,
 		})
