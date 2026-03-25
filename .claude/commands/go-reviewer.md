@@ -52,9 +52,11 @@ List each issue with:
 - **File and line reference** (e.g. `cmd/root.go:142`)
 - **Severity**: `bug`, `regression`, `concern`, or `suggestion`
 - **What's wrong** and **why it matters** - be specific
+- **Concrete near-term cost** of not fixing it. "Could cause problems if..." or "worth being aware of" is not sufficient - name the scenario that will actually happen. If you can't name one, don't include the issue.
 - **Suggested fix** if you have one
 
-Before finalizing your issues list, re-read each `suggestion` and `concern` and ask yourself: "Would a pragmatic senior engineer consider this overengineering for the current stage and scope of the project?" If the answer is yes - if the suggestion adds complexity, abstraction, or defensive code that isn't justified by a concrete present-day problem - drop it. Only keep suggestions where the cost of NOT doing it is real and near-term.
+### Dropped
+After drafting your issues, re-evaluate each `suggestion` and `concern` one more time. List items you considered but cut, with a one-line reason each. If this section is empty, explain why every issue survived the filter.
 
 ### Unification opportunities
 If you found duplicated logic or missed reuse opportunities, list them here.
