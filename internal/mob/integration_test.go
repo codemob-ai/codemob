@@ -74,10 +74,63 @@ func initRepo(t *testing.T, bin, repoPath string) {
 	t.Helper()
 	cmd := exec.Command(bin, "init")
 	cmd.Dir = repoPath
-	cmd.Stdin = strings.NewReader("main\nclaude\n")
+	cmd.Stdin = strings.NewReader("y\n")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("init failed: %s\n%s", err, out)
+	}
+}
+
+// initRepoWithMobsDir runs codemob init with a specific mobs dir choice (1=project, 2=enclosing, 3=global).
+func initRepoWithMobsDir(t *testing.T, bin, repoPath, choice string) {
+	t.Helper()
+	cmd := exec.Command(bin, "init")
+	cmd.Dir = repoPath
+	// The init flow reads: Continue? -> base branch -> default agent -> mobs dir choice
+	// The first reader in Init() buffers everything, so setupRepo's reader gets EOF for
+	// base branch and agent (using defaults). We need to provide input that reaches
+	// the mobs dir prompt. Since the first bufio.NewReader buffers all input and only
+	// consumes the Continue? line, setupRepo creates its own reader which gets nothing.
+	// So we must provide all answers through a single stdin.
+	// Continue? prompt consumes first line, rest goes to setupRepo's reader via EOF.
+	// Actually: Init's reader buffers all bytes. setupRepo's new reader gets nothing from
+	// os.Stdin (already consumed into first reader's buffer). So all setupRepo prompts
+	// get empty input (defaults). The mobs_dir prompt also gets empty input = choice "1".
+	// To actually pass a choice, we need to pipe through a single reader.
+	// Fix: we write the config directly after init instead.
+	cmd.Stdin = strings.NewReader("y\n")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("init failed: %s\n%s", err, out)
+	}
+
+	// Now patch the config with the chosen mobs_dir
+	repoName := filepath.Base(repoPath)
+	home := os.Getenv("HOME")
+	configPath := filepath.Join(repoPath, ".codemob", "config.json")
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("failed to read config: %v", err)
+	}
+	var cfg map[string]interface{}
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		t.Fatalf("failed to parse config: %v", err)
+	}
+
+	cfg["repo_root"] = repoPath
+	switch choice {
+	case "2":
+		cfg["mobs_dir"] = filepath.Join(filepath.Dir(repoPath), ".codemob", repoName, "mobs")
+	case "3":
+		cfg["mobs_dir"] = filepath.Join(home, ".codemob", repoName, "mobs")
+	}
+
+	data, _ = json.MarshalIndent(cfg, "", "  ")
+	os.WriteFile(configPath, append(data, '\n'), 0644)
+
+	// Create the mobs directory
+	if mobsDir, ok := cfg["mobs_dir"].(string); ok && mobsDir != "" {
+		os.MkdirAll(mobsDir, 0755)
 	}
 }
 
@@ -387,7 +440,7 @@ func TestRemoveMob(t *testing.T) {
 	runCore(t, bin, repoPath, "new", "remove-me", "--no-launch")
 
 	// when
-	out := runCore(t, bin, repoPath, "remove", "remove-me")
+	out := runCore(t, bin, repoPath, "remove", "remove-me", "--force")
 
 	// then
 	if !strings.Contains(out, "Removed") {
@@ -567,7 +620,7 @@ func TestRemoveByIndex(t *testing.T) {
 	runCore(t, bin, repoPath, "new", "second", "--no-launch")
 
 	// when -> remove by index
-	runCore(t, bin, repoPath, "remove", "1")
+	runCore(t, bin, repoPath, "remove", "1", "--force")
 
 	// then -> only second remains
 	cfg := readConfig(t, repoPath)
@@ -651,7 +704,7 @@ func TestRemoveCleansSessionFiles(t *testing.T) {
 	writeSessionFile(t, repoPath, "sess-c", "other")
 
 	// when -> remove target
-	runCore(t, bin, repoPath, "remove", "target")
+	runCore(t, bin, repoPath, "remove", "target", "--force")
 
 	// then -> session files for target should be gone
 	sessDir := filepath.Join(repoPath, ".codemob", "sessions")
@@ -893,7 +946,7 @@ func TestResumeIgnoresRemovedMobInSession(t *testing.T) {
 
 	// given -> session points to temp, but we remove it
 	writeSessionFile(t, repoPath, "sess-3", "temp")
-	runCore(t, bin, repoPath, "remove", "temp")
+	runCore(t, bin, repoPath, "remove", "temp", "--force")
 
 	// when -> resume with empty input (session mob is gone, only one mob left)
 	out, err := runCoreWithSession(t, bin, repoPath, "sess-3", "", "resume", "--no-launch")
@@ -1199,5 +1252,199 @@ func TestPathReservedName(t *testing.T) {
 	// then
 	if !strings.Contains(out, "reserved") {
 		t.Errorf("expected 'reserved' error, got: %s", out)
+	}
+}
+
+// ─── External mobs directory tests ───────────────────────────────────────────
+
+func TestMobsDirEnclosing(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepoWithMobsDir(t, bin, repoPath, "2")
+
+	repoName := filepath.Base(repoPath)
+	expectedMobsDir := filepath.Join(filepath.Dir(repoPath), ".codemob", repoName, "mobs")
+
+	// when -> create a mob
+	runCore(t, bin, repoPath, "new", "enc-test", "--no-launch")
+
+	// then -> worktree should exist at the enclosing path
+	worktreePath := filepath.Join(expectedMobsDir, "enc-test")
+	if _, err := os.Stat(worktreePath); err != nil {
+		t.Errorf("worktree not created at enclosing path %s: %v", worktreePath, err)
+	}
+
+	// then -> should NOT exist in the project dir
+	projectPath := filepath.Join(repoPath, ".codemob", "mobs", "enc-test")
+	if _, err := os.Stat(projectPath); err == nil {
+		t.Error("worktree should not exist in project dir")
+	}
+
+	// then -> path command should return the external path
+	pathOut := strings.TrimSpace(runCore(t, bin, repoPath, "path", "enc-test"))
+	if pathOut != worktreePath {
+		t.Errorf("expected path %s, got %s", worktreePath, pathOut)
+	}
+
+	// when -> remove the mob
+	runCore(t, bin, repoPath, "remove", "enc-test", "--force")
+
+	// then -> worktree should be gone
+	if _, err := os.Stat(worktreePath); err == nil {
+		t.Error("worktree should have been removed")
+	}
+}
+
+func TestMobsDirGlobal(t *testing.T) {
+	bin := buildCore(t)
+	home, repoPath := setupTestRepo(t)
+	initRepoWithMobsDir(t, bin, repoPath, "3")
+
+	repoName := filepath.Base(repoPath)
+	expectedMobsDir := filepath.Join(home, ".codemob", repoName, "mobs")
+
+	// when -> create a mob
+	runCore(t, bin, repoPath, "new", "global-test", "--no-launch")
+
+	// then -> worktree should exist at the global path
+	worktreePath := filepath.Join(expectedMobsDir, "global-test")
+	if _, err := os.Stat(worktreePath); err != nil {
+		t.Errorf("worktree not created at global path %s: %v", worktreePath, err)
+	}
+
+	// then -> path command should return the global path
+	pathOut := strings.TrimSpace(runCore(t, bin, repoPath, "path", "global-test"))
+	if pathOut != worktreePath {
+		t.Errorf("expected path %s, got %s", worktreePath, pathOut)
+	}
+
+	// when -> remove the mob
+	runCore(t, bin, repoPath, "remove", "global-test", "--force")
+
+	// then -> worktree should be gone
+	if _, err := os.Stat(worktreePath); err == nil {
+		t.Error("worktree should have been removed")
+	}
+}
+
+func TestMobsDirProjectDefault(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	// given -> config should have mobs_dir set to the project path
+	cfg := readConfig(t, repoPath)
+	mobsDir, _ := cfg["mobs_dir"].(string)
+	if mobsDir == "" || !strings.HasSuffix(mobsDir, ".codemob/mobs") {
+		t.Errorf("expected mobs_dir ending in .codemob/mobs, got %v", cfg["mobs_dir"])
+	}
+
+	// when -> create a mob
+	runCore(t, bin, repoPath, "new", "default-test", "--no-launch")
+
+	// then -> worktree should be at the project-dir path
+	worktreePath := filepath.Join(mobsDir, "default-test")
+	if _, err := os.Stat(worktreePath); err != nil {
+		t.Errorf("worktree not at project path: %v", err)
+	}
+}
+
+func TestReconcileExternalDir(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepoWithMobsDir(t, bin, repoPath, "2")
+
+	// given -> create a mob, then manually remove the worktree
+	runCore(t, bin, repoPath, "new", "orphan-ext", "--no-launch")
+
+	repoName := filepath.Base(repoPath)
+	worktreePath := filepath.Join(filepath.Dir(repoPath), ".codemob", repoName, "mobs", "orphan-ext")
+	run(t, repoPath, "git", "worktree", "remove", "-f", worktreePath)
+
+	// when -> list triggers reconciliation
+	runCore(t, bin, repoPath, "list")
+
+	// then -> config should no longer have the orphaned mob
+	cfg := readConfig(t, repoPath)
+	mobs, _ := cfg["mobs"].([]interface{})
+	if len(mobs) != 0 {
+		t.Errorf("expected 0 mobs after reconcile, got %d", len(mobs))
+	}
+}
+
+func TestInsideWorktreeExternal(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepoWithMobsDir(t, bin, repoPath, "2")
+
+	// given -> create a mob at the enclosing path
+	runCore(t, bin, repoPath, "new", "ext-detect", "--no-launch")
+
+	repoName := filepath.Base(repoPath)
+	worktreePath := filepath.Join(filepath.Dir(repoPath), ".codemob", repoName, "mobs", "ext-detect")
+
+	// when -> run codemob list from inside the external worktree
+	out := runCore(t, bin, worktreePath, "list")
+
+	// then -> should find the repo and list the mob
+	if !strings.Contains(out, "ext-detect") {
+		t.Errorf("expected 'ext-detect' in list output from external worktree, got: %s", out)
+	}
+}
+
+func TestPathCommandExternal(t *testing.T) {
+	bin := buildCore(t)
+	home, repoPath := setupTestRepo(t)
+	initRepoWithMobsDir(t, bin, repoPath, "3")
+
+	// given -> create a mob
+	runCore(t, bin, repoPath, "new", "path-ext", "--no-launch")
+
+	repoName := filepath.Base(repoPath)
+	expectedPath := filepath.Join(home, ".codemob", repoName, "mobs", "path-ext")
+
+	// when
+	out := strings.TrimSpace(runCore(t, bin, repoPath, "path", "path-ext"))
+
+	// then
+	if out != expectedPath {
+		t.Errorf("expected path %s, got %s", expectedPath, out)
+	}
+}
+
+func TestPurgeExternalMobs(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepoWithMobsDir(t, bin, repoPath, "2")
+
+	// given -> create two mobs
+	runCore(t, bin, repoPath, "new", "purge-a", "--no-launch")
+	runCore(t, bin, repoPath, "new", "purge-b", "--no-launch")
+
+	repoName := filepath.Base(repoPath)
+	mobsDir := filepath.Join(filepath.Dir(repoPath), ".codemob", repoName, "mobs")
+
+	// when -> purge with confirmation
+	cmd := exec.Command(bin, "purge")
+	cmd.Dir = repoPath
+	cmd.Stdin = strings.NewReader("y\n")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("purge failed: %s\n%s", err, out)
+	}
+
+	// then -> worktrees should be gone
+	if _, err := os.Stat(filepath.Join(mobsDir, "purge-a")); err == nil {
+		t.Error("purge-a worktree should have been removed")
+	}
+	if _, err := os.Stat(filepath.Join(mobsDir, "purge-b")); err == nil {
+		t.Error("purge-b worktree should have been removed")
+	}
+
+	// then -> config should have no mobs
+	cfg := readConfig(t, repoPath)
+	mobs, _ := cfg["mobs"].([]interface{})
+	if len(mobs) != 0 {
+		t.Errorf("expected 0 mobs after purge, got %d", len(mobs))
 	}
 }

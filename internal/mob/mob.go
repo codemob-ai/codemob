@@ -27,13 +27,34 @@ type Mob struct {
 type Config struct {
 	DefaultAgent string `json:"default_agent"`
 	BaseBranch   string `json:"base_branch"`
+	RepoRoot     string `json:"repo_root,omitempty"`
+	MobsDirPath  string `json:"mobs_dir,omitempty"`
 	Mobs         []Mob  `json:"mobs"`
+}
+
+// MobsPath returns the absolute path to the mobs directory.
+func MobsPath(repoRoot string, cfg *Config) string {
+	if cfg != nil && cfg.MobsDirPath != "" {
+		return cfg.MobsDirPath
+	}
+	return filepath.Join(repoRoot, MobsDir)
+}
+
+// MobPath returns the absolute path to a specific mob's worktree.
+func MobPath(repoRoot string, cfg *Config, name string) string {
+	return filepath.Join(MobsPath(repoRoot, cfg), name)
 }
 
 // FindRepoRoot finds the main repo root, accounting for being inside a mob worktree.
 func FindRepoRoot() (string, error) {
-	if root := InsideWorktree(); root != "" {
-		return root, nil
+	mainRoot, toplevel := insideWorktreeEx()
+	if mainRoot != "" {
+		return mainRoot, nil
+	}
+	// Not in a worktree. toplevel is already computed from the slow path
+	// (empty if the fast path matched or git failed).
+	if toplevel != "" {
+		return toplevel, nil
 	}
 	return gitutil.RepoRoot()
 }
@@ -41,14 +62,60 @@ func FindRepoRoot() (string, error) {
 // InsideWorktree returns the repo root if the current directory is inside a
 // codemob worktree, or empty string if not.
 func InsideWorktree() string {
+	root, _ := insideWorktreeEx()
+	return root
+}
+
+// insideWorktreeEx detects if we're inside a codemob worktree.
+// Returns (mainRepoRoot, toplevel). mainRepoRoot is non-empty only when inside
+// a codemob worktree. toplevel is the git toplevel from the slow path (may be
+// empty if the fast path matched or git is unavailable).
+func insideWorktreeEx() (mainRoot, toplevel string) {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return ""
+		return "", ""
 	}
+
+	// Fast path: project-dir mode (worktrees inside the repo)
 	if idx := strings.Index(cwd, "/"+MobsDir+"/"); idx != -1 {
-		return cwd[:idx]
+		return cwd[:idx], ""
 	}
-	return ""
+
+	// Slow path: external worktrees - use git to detect
+	toplevel, err = gitutil.RepoRoot()
+	if err != nil {
+		return "", ""
+	}
+	commonDir, err := gitutil.CommonDir()
+	if err != nil {
+		return "", toplevel
+	}
+
+	if !filepath.IsAbs(commonDir) {
+		commonDir = filepath.Join(toplevel, commonDir)
+	}
+	commonDir = filepath.Clean(commonDir)
+
+	mainRoot = filepath.Dir(commonDir)
+
+	// Resolve symlinks before comparing (macOS /var -> /private/var, etc.)
+	if resolved, err := filepath.EvalSymlinks(mainRoot); err == nil {
+		mainRoot = resolved
+	}
+	if resolved, err := filepath.EvalSymlinks(toplevel); err == nil {
+		toplevel = resolved
+	}
+
+	// If toplevel == mainRoot, we're in the main repo, not a worktree
+	if toplevel == mainRoot {
+		return "", toplevel
+	}
+
+	// We're in a worktree. Check if the main repo has codemob initialized.
+	if _, err := os.Stat(filepath.Join(mainRoot, ConfigFile)); err != nil {
+		return "", toplevel
+	}
+	return mainRoot, toplevel
 }
 
 // IsInitialized checks if codemob is initialized in the given repo.
@@ -85,7 +152,7 @@ func Reconcile(repoRoot string, cfg *Config) []string {
 	var removed []string
 	valid := make([]Mob, 0)
 	for _, m := range cfg.Mobs {
-		mobPath := filepath.Join(repoRoot, MobsDir, m.Name)
+		mobPath := MobPath(repoRoot, cfg, m.Name)
 		if _, err := os.Stat(mobPath); err == nil {
 			valid = append(valid, m)
 		} else {
@@ -128,21 +195,71 @@ func ValidateName(name string) error {
 
 // CurrentMobName returns the name of the mob we're currently inside, or "" if not in a mob.
 func CurrentMobName() string {
+	if name := os.Getenv("CODEMOB_MOB"); name != "" {
+		return name
+	}
+	return currentMobNameFromCwd("")
+}
+
+// CurrentMobNameForRoot returns the mob name when the repo root is already known,
+// avoiding a redundant InsideWorktree call.
+func CurrentMobNameForRoot(repoRoot string) string {
+	if name := os.Getenv("CODEMOB_MOB"); name != "" {
+		return name
+	}
+	return currentMobNameFromCwd(repoRoot)
+}
+
+func currentMobNameFromCwd(knownRoot string) string {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return ""
 	}
+
+	// Fast path: path-based detection (works for project-dir mode)
 	marker := "/" + MobsDir + "/"
-	idx := strings.Index(cwd, marker)
-	if idx == -1 {
+	if idx := strings.Index(cwd, marker); idx != -1 {
+		rest := cwd[idx+len(marker):]
+		if slash := strings.Index(rest, "/"); slash != -1 {
+			return rest[:slash]
+		}
+		return rest
+	}
+
+	// Slow path: external worktrees - load config and match cwd against mob paths
+	root := knownRoot
+	if root == "" {
+		root = InsideWorktree()
+		if root == "" {
+			return ""
+		}
+	}
+	cfg, err := LoadConfig(root)
+	if err != nil {
 		return ""
 	}
-	rest := cwd[idx+len(marker):]
-	// Take the first path component
-	if slash := strings.Index(rest, "/"); slash != -1 {
-		return rest[:slash]
+	for _, m := range cfg.Mobs {
+		mobPath := MobPath(root, cfg, m.Name)
+		if cwd == mobPath || strings.HasPrefix(cwd, mobPath+"/") {
+			return m.Name
+		}
 	}
-	return rest
+	return ""
+}
+
+// CleanupExternalMobsDir removes an external mobs directory and its empty parent directories.
+// Skips cleanup if the path is inside repoRoot (project-dir mode).
+func CleanupExternalMobsDir(repoRoot, mobsDirPath string) {
+	if mobsDirPath == "" || strings.HasPrefix(mobsDirPath, repoRoot+"/") {
+		return
+	}
+	os.RemoveAll(mobsDirPath)
+	parent := filepath.Dir(mobsDirPath)
+	os.Remove(parent)
+	grandparent := filepath.Dir(parent)
+	if filepath.Base(grandparent) == ".codemob" {
+		os.Remove(grandparent)
+	}
 }
 
 // FindMob finds a mob by name.

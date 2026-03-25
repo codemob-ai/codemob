@@ -22,6 +22,14 @@ func RepoRoot() (string, error) {
 	return strings.TrimSpace(out), nil
 }
 
+func CommonDir() (string, error) {
+	out, err := runGit("", "rev-parse", "--git-common-dir")
+	if err != nil {
+		return "", fmt.Errorf("not inside a git repository")
+	}
+	return strings.TrimSpace(out), nil
+}
+
 func WorktreeList(repoRoot string) ([]WorktreeInfo, error) {
 	out, err := runGit(repoRoot, "worktree", "list", "--porcelain")
 	if err != nil {
@@ -56,6 +64,11 @@ func WorktreeRemove(repoRoot, path string, force bool) error {
 		return fmt.Errorf("failed to remove worktree: %w", err)
 	}
 	return nil
+}
+
+func BranchExists(repoRoot, branch string) bool {
+	_, err := runGit(repoRoot, "rev-parse", "--verify", branch)
+	return err == nil
 }
 
 func BranchDelete(repoRoot, branch string) {

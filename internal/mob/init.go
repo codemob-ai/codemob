@@ -65,26 +65,36 @@ Then tell the user: "Agent switch queued. Exit this session (Ctrl+C) and codemob
 	},
 	"remove": {
 		Description: "Remove a codemob workspace",
-		Body: triggerGuard + `Run ` + "`codemob list`" + ` using the Bash tool and display the results.
-
-Determine the current mob by checking if the working directory contains ` + "`.codemob/mobs/`" + ` — if so, extract the mob name from the path.
+		Body: triggerGuard + `Run ` + "`codemob list`" + ` using the Bash tool and display the results. The current mob is marked with ◀.
 
 Ask the user which mob they want to remove.
 
-If they choose a DIFFERENT mob (not the current one), run ` + "`codemob remove <name>`" + ` directly.
+If they choose a DIFFERENT mob (not the one marked with ◀), run ` + "`codemob remove <name>`" + ` directly.
 
-If they choose the CURRENT mob, run ` + "`codemob queue remove <name>`" + ` and tell them: "Removal queued. Exit this session (Ctrl+C) and codemob will remove the mob."
+If they choose the CURRENT mob (marked with ◀), run this exact command:
+
+` + "```" + `
+codemob queue remove "$CODEMOB_MOB"
+` + "```" + `
+
+$CODEMOB_MOB is already set in your environment. There is no need to echo it - the command above will resolve it automatically.
+
+Then tell the user: "Removal queued. Exit this session (Ctrl+C) and codemob will remove the mob."
 `,
 	},
 	"drop": {
 		Description: "Remove the current codemob workspace and exit",
-		Body: triggerGuard + `Determine the current mob by checking if the working directory contains ` + "`.codemob/mobs/`" + ` — if so, extract the mob name from the path.
+		Body: triggerGuard + `Run this exact command using the Bash tool:
 
-If you are NOT inside a codemob worktree, tell the user: "This command can only be used from within a codemob workspace." and stop.
+` + "```" + `
+codemob queue remove "$CODEMOB_MOB"
+` + "```" + `
 
-Otherwise, run ` + "`codemob queue remove <name>`" + ` using the Bash tool (replace ` + "`<name>`" + ` with the current mob name).
+$CODEMOB_MOB is already set in your environment. There is no need to echo it - the command above will resolve it automatically.
 
-Then tell the user: "Mob '<name>' queued for removal. Exit this session (Ctrl+C) and codemob will remove it."
+If the command fails, tell the user: "This command can only be used from within a codemob workspace." and stop.
+
+Otherwise, tell the user: "Mob queued for removal. Exit this session (Ctrl+C) and codemob will remove it."
 `,
 	},
 }
@@ -197,6 +207,9 @@ func Init(installDir string, forceReprompt bool) error {
 	fmt.Println("Repo setup:")
 	bothReady := claude.installed && codex.installed
 	repoRoot := setupRepo(forceReprompt)
+	if repoRoot == "" {
+		return nil // not in a git repo, or user cancelled
+	}
 	if claude.installed {
 		setupClaudeCommands(repoRoot, bothReady)
 	}
@@ -601,8 +614,6 @@ func setupRepo(reprompt bool) string {
 		return ""
 	}
 
-	os.MkdirAll(filepath.Join(root, MobsDir), 0755)
-
 	// Load existing config or start with defaults
 	cfg, _ := LoadConfig(root)
 	isNew := cfg == nil
@@ -614,12 +625,13 @@ func setupRepo(reprompt bool) string {
 		}
 	}
 
-	if !isNew && !reprompt {
+	fullyConfigured := cfg.RepoRoot != ""
+
+	if !isNew && !reprompt && fullyConfigured {
 		info(fmt.Sprintf("Repo already initialized at %s", root))
 		return root
 	}
 
-	// Prompt
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Println()
 	fmt.Printf("Base branch for new mobs [%s]: ", cfg.BaseBranch)
@@ -633,6 +645,64 @@ func setupRepo(reprompt bool) string {
 	if v := strings.TrimSpace(input); v != "" {
 		cfg.DefaultAgent = v
 	}
+
+	// Mobs directory prompt
+	repoName := filepath.Base(root)
+	home := os.Getenv("HOME")
+	enclosingPath := filepath.Join(filepath.Dir(root), ".codemob", repoName, "mobs")
+	globalPath := filepath.Join(home, ".codemob", repoName, "mobs")
+
+	currentDefault := "1"
+	switch cfg.MobsDirPath {
+	case enclosingPath:
+		currentDefault = "2"
+	case globalPath:
+		currentDefault = "3"
+	}
+
+	fmt.Println()
+	fmt.Println("Where should mob worktrees live?")
+	fmt.Printf("  1) Project dir    %s/\n", filepath.Join(root, MobsDir))
+	fmt.Printf("  2) Enclosing dir  %s/\n", enclosingPath)
+	fmt.Printf("  3) Global dir     %s/\n", globalPath)
+	fmt.Printf("\nMobs directory [%s]: ", currentDefault)
+	input, _ = reader.ReadString('\n')
+	choice := strings.TrimSpace(input)
+	if choice == "" {
+		choice = currentDefault
+	}
+
+	oldMobsDir := cfg.MobsDirPath
+	switch choice {
+	case "2":
+		cfg.MobsDirPath = enclosingPath
+	case "3":
+		cfg.MobsDirPath = globalPath
+	default:
+		cfg.MobsDirPath = filepath.Join(root, MobsDir)
+	}
+
+	if !isNew && oldMobsDir != cfg.MobsDirPath && len(cfg.Mobs) > 0 {
+		fmt.Println()
+		errMsg(fmt.Sprintf("You have %d existing mob(s) at the old location.", len(cfg.Mobs)))
+		fmt.Println("  codemob will no longer track them, but the worktrees (and the linked git branches) will remain on disk.")
+		fmt.Println("  Run 'codemob purge' or 'codemob remove' first to clean them up.")
+		fmt.Print("\nContinue anyway? [y/N]: ")
+		input, _ = reader.ReadString('\n')
+		if v := strings.TrimSpace(strings.ToLower(input)); v != "y" && v != "yes" {
+			fmt.Println("Cancelled.")
+			return ""
+		}
+	}
+
+	if resolved, err := filepath.EvalSymlinks(root); err == nil {
+		cfg.RepoRoot = resolved
+	} else {
+		cfg.RepoRoot = root
+	}
+
+	// Create the mobs directory
+	os.MkdirAll(MobsPath(root, cfg), 0755)
 
 	if err := SaveConfig(root, cfg); err != nil {
 		warn(fmt.Sprintf("Could not write config: %v", err))
@@ -688,10 +758,13 @@ func Uninstall(installDir string) error {
 		cfg, err := LoadConfig(repoRoot)
 		if err == nil {
 			for _, m := range cfg.Mobs {
-				worktreePath := filepath.Join(repoRoot, MobsDir, m.Name)
+				worktreePath := MobPath(repoRoot, cfg, m.Name)
 				_ = gitutil.WorktreeRemove(repoRoot, worktreePath, true)
 				gitutil.BranchDelete(repoRoot, m.Branch)
 			}
+		}
+		if cfg != nil {
+			CleanupExternalMobsDir(repoRoot, cfg.MobsDirPath)
 		}
 		// Remove .codemob/ directory
 		os.RemoveAll(filepath.Join(repoRoot, CodemobDir))

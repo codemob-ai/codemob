@@ -85,6 +85,7 @@ internal/
   mob/names.go          # random name generation (adjective-fruit)
   mob/integration_test.go
 Makefile                # build/install/test
+KNOWN_ISSUES.md         # tracked issues not yet fixed
 ```
 
 ## Data model
@@ -94,6 +95,8 @@ Makefile                # build/install/test
 {
   "default_agent": "claude",
   "base_branch": "main",
+  "repo_root": "/Users/you/repos/android",
+  "mobs_dir": "/Users/you/repos/.codemob/android/mobs",
   "mobs": [
     {
       "name": "fix-auth-bug",
@@ -105,6 +108,8 @@ Makefile                # build/install/test
 }
 ```
 
+**Config stores explicit absolute paths.** Both `repo_root` and `mobs_dir` are always set to absolute paths during init. If reality diverges (repo moved, mobs dir deleted), codemob fails with a hard error telling the user to reinit. This is intentional - we accept that repo moves require reinit rather than adding dynamic resolution or fallback logic.
+
 `.codemob/queue.json` (transient, written by slash commands):
 ```json
 {
@@ -113,6 +118,10 @@ Makefile                # build/install/test
   "mob": ""
 }
 ```
+
+## Design philosophy
+
+codemob is early-stage. Optimize for the common user, not power users. Consider what power users want/need, but don't add complexity to accommodate edge cases they create (e.g., hand-editing config files). Keep the product simple and predictable - complexity is the enemy at this stage.
 
 ## CLI conventions
 
