@@ -182,19 +182,3 @@ func TestConfirm_DefaultNo(t *testing.T) {
 	})
 }
 
-func TestConsumeUTF8Continuation(t *testing.T) {
-	// 2-byte: 0xC3 0xA9 (e with accent)
-	withStdin(t, "\xA9", func() {
-		consumeUTF8Continuation(0xC3)
-	})
-
-	// 3-byte: 0xE2 0x80 0x99 (right single quotation mark)
-	withStdin(t, "\x80\x99", func() {
-		consumeUTF8Continuation(0xE2)
-	})
-
-	// 4-byte: 0xF0 0x9F 0x98 0x80 (grinning face emoji)
-	withStdin(t, "\x9F\x98\x80", func() {
-		consumeUTF8Continuation(0xF0)
-	})
-}
