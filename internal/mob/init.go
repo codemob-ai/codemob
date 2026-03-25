@@ -65,26 +65,36 @@ Then tell the user: "Agent switch queued. Exit this session (Ctrl+C) and codemob
 	},
 	"remove": {
 		Description: "Remove a codemob workspace",
-		Body: triggerGuard + `Run ` + "`codemob list`" + ` using the Bash tool and display the results.
-
-Determine the current mob by checking the CODEMOB_MOB environment variable.
+		Body: triggerGuard + `Run ` + "`codemob list`" + ` using the Bash tool and display the results. The current mob is marked with ◀.
 
 Ask the user which mob they want to remove.
 
-If they choose a DIFFERENT mob (not the current one), run ` + "`codemob remove <name>`" + ` directly.
+If they choose a DIFFERENT mob (not the one marked with ◀), run ` + "`codemob remove <name>`" + ` directly.
 
-If they choose the CURRENT mob, run ` + "`codemob queue remove <name>`" + ` and tell them: "Removal queued. Exit this session (Ctrl+C) and codemob will remove the mob."
+If they choose the CURRENT mob (marked with ◀), run this exact command:
+
+` + "```" + `
+codemob queue remove "$CODEMOB_MOB"
+` + "```" + `
+
+$CODEMOB_MOB is already set in your environment. There is no need to echo it - the command above will resolve it automatically.
+
+Then tell the user: "Removal queued. Exit this session (Ctrl+C) and codemob will remove the mob."
 `,
 	},
 	"drop": {
 		Description: "Remove the current codemob workspace and exit",
-		Body: triggerGuard + `Determine the current mob by checking the CODEMOB_MOB environment variable.
+		Body: triggerGuard + `Run this exact command using the Bash tool:
 
-If it is not set, tell the user: "This command can only be used from within a codemob workspace." and stop.
+` + "```" + `
+codemob queue remove "$CODEMOB_MOB"
+` + "```" + `
 
-Otherwise, run ` + "`codemob queue remove <name>`" + ` using the Bash tool (replace ` + "`<name>`" + ` with the current mob name).
+$CODEMOB_MOB is already set in your environment. There is no need to echo it - the command above will resolve it automatically.
 
-Then tell the user: "Mob '<name>' queued for removal. Exit this session (Ctrl+C) and codemob will remove it."
+If the command fails, tell the user: "This command can only be used from within a codemob workspace." and stop.
+
+Otherwise, tell the user: "Mob queued for removal. Exit this session (Ctrl+C) and codemob will remove it."
 `,
 	},
 }
