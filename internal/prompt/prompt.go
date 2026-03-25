@@ -13,6 +13,8 @@ import (
 
 var ErrCancelled = errors.New("cancelled")
 
+var fallbackReader *bufio.Reader
+
 func ReadLine(fallback string) (string, error) {
 	fd := int(os.Stdin.Fd())
 	if !term.IsTerminal(fd) {
@@ -98,16 +100,12 @@ func isStandaloneEsc() bool {
 		if _, err := os.Stdin.Read(b); err == nil {
 			ch <- b[0]
 		}
-		close(ch)
 	}()
 
 	select {
-	case next, ok := <-ch:
-		if !ok {
-			return true
-		}
+	case next := <-ch:
 		if next == '[' || next == 'O' {
-			drainSequence(ch)
+			drainSequence()
 		}
 		return false
 	case <-time.After(50 * time.Millisecond):
@@ -115,26 +113,15 @@ func isStandaloneEsc() bool {
 	}
 }
 
-// drainSequence consumes the remaining bytes of a CSI or SS3 escape sequence.
-func drainSequence(ch chan byte) {
+// drainSequence consumes the remaining bytes of a CSI or SS3 escape sequence
+// directly from stdin.
+func drainSequence() {
+	b := make([]byte, 1)
 	for {
-		var next byte
-		var ok bool
-
-		select {
-		case next, ok = <-ch:
-			if !ok {
-				return
-			}
-		default:
-			b := make([]byte, 1)
-			if _, err := os.Stdin.Read(b); err != nil {
-				return
-			}
-			next = b[0]
+		if _, err := os.Stdin.Read(b); err != nil {
+			return
 		}
-
-		if next >= 0x40 && next <= 0x7E {
+		if b[0] >= 0x40 && b[0] <= 0x7E {
 			return
 		}
 	}
@@ -159,8 +146,10 @@ func consumeUTF8Continuation(leading byte) {
 }
 
 func readLineFallback(fallback string) (string, error) {
-	reader := bufio.NewReader(os.Stdin)
-	input, err := reader.ReadString('\n')
+	if fallbackReader == nil {
+		fallbackReader = bufio.NewReader(os.Stdin)
+	}
+	input, err := fallbackReader.ReadString('\n')
 	if err != nil {
 		return fallback, nil
 	}

@@ -13,8 +13,13 @@ func withStdin(t *testing.T, input string, fn func()) {
 		t.Fatal(err)
 	}
 	orig := os.Stdin
+	origReader := fallbackReader
 	os.Stdin = r
-	t.Cleanup(func() { os.Stdin = orig })
+	fallbackReader = nil
+	t.Cleanup(func() {
+		os.Stdin = orig
+		fallbackReader = origReader
+	})
 
 	w.WriteString(input)
 	w.Close()
@@ -89,6 +94,34 @@ func TestReadLine_PipedEmptyInput(t *testing.T) {
 		}
 		if got != "fallback" {
 			t.Errorf("got %q, want %q", got, "fallback")
+		}
+	})
+}
+
+func TestReadLine_PipedMultipleCalls(t *testing.T) {
+	withStdin(t, "first\nsecond\nthird\n", func() {
+		got1, err := ReadLine("default1")
+		if err != nil {
+			t.Fatalf("call 1: unexpected error: %v", err)
+		}
+		if got1 != "first" {
+			t.Errorf("call 1: got %q, want %q", got1, "first")
+		}
+
+		got2, err := ReadLine("default2")
+		if err != nil {
+			t.Fatalf("call 2: unexpected error: %v", err)
+		}
+		if got2 != "second" {
+			t.Errorf("call 2: got %q, want %q", got2, "second")
+		}
+
+		got3, err := ReadLine("default3")
+		if err != nil {
+			t.Fatalf("call 3: unexpected error: %v", err)
+		}
+		if got3 != "third" {
+			t.Errorf("call 3: got %q, want %q", got3, "third")
 		}
 	})
 }
