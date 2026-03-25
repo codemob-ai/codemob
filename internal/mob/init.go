@@ -197,6 +197,9 @@ func Init(installDir string, forceReprompt bool) error {
 	fmt.Println("Repo setup:")
 	bothReady := claude.installed && codex.installed
 	repoRoot := setupRepo(forceReprompt)
+	if repoRoot == "" {
+		return nil // not in a git repo, or user cancelled
+	}
 	if claude.installed {
 		setupClaudeCommands(repoRoot, bothReady)
 	}
@@ -678,7 +681,7 @@ func setupRepo(reprompt bool) string {
 		input, _ = reader.ReadString('\n')
 		if v := strings.TrimSpace(strings.ToLower(input)); v != "y" && v != "yes" {
 			fmt.Println("Cancelled.")
-			return root
+			return ""
 		}
 	}
 
