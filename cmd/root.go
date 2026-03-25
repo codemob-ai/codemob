@@ -265,7 +265,16 @@ func createMob(root string, cfg *mob.Config, name, agent string) (string, error)
 
 	branch := "mob/" + name
 	if gitutil.BranchExists(root, branch) {
-		return "", fmt.Errorf("branch '%s' already exists (leftover from a previous mob?). Run: git branch -D %s", branch, branch)
+		hint := fmt.Sprintf("git branch -D %s", branch)
+		if wts, err := gitutil.WorktreeList(root); err == nil {
+			for _, wt := range wts {
+				if wt.Branch == "refs/heads/"+branch {
+					hint = fmt.Sprintf("git worktree remove %s && git branch -D %s", wt.Path, branch)
+					break
+				}
+			}
+		}
+		return "", fmt.Errorf("branch '%s' already exists (leftover from a previous mob?). Run:\n  %s", branch, hint)
 	}
 	worktreePath := mob.MobPath(root, cfg, name)
 
