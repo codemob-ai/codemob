@@ -17,8 +17,22 @@ type commandDef struct {
 	Body        string // instructions for the agent
 }
 
-const triggerGuard = `. IMPORTANT: Do NOT invoke unless user explicitly mentions "mob" or "codemob"` +
-	` - generic requests like "new", "list", "switch", "remove" must NOT trigger this.`
+// Trigger guard: two layers to prevent false skill invocation.
+//
+// Problem: skill names like "mob-new" cause agents to pattern-match generic
+// user input ("new", "list", "drop") to codemob skills. The agent sees the
+// skill name, matches a keyword, and invokes before reading the description.
+//
+// Layer 1 (triggerGuard): prepended to the first line (the description shown
+// in the skill picker). Truncated at ~97 chars, so keep it short and front-loaded.
+// This prevents invocation in most cases.
+const triggerGuard = `MUST HAVE "mob"/"codemob" in user message. `
+
+// Layer 2 (bodyGuard): prepended to the skill body (loaded after invocation).
+// If the agent invokes despite layer 1, this instruction tells it to abort.
+const bodyGuard = `STOP. Re-read the user's message. If it does not literally contain the word "mob" or "codemob", do NOT proceed. Instead, apologize for the false match and ask what they meant.
+
+`
 
 const confirmationGuardLaunch = `IMPORTANT: Before running the codemob queue command, you MUST get explicit confirmation from the user. Tell them: "This will end our current conversation. codemob will automatically close this session and launch the new one. Are you sure?"
 
@@ -117,7 +131,7 @@ func SlashCommands(multipleAgents bool) map[string]string {
 		if name == "change-agent" && !multipleAgents {
 			continue
 		}
-		content := def.Description + triggerGuard + "\n\n" + def.Body
+		content := triggerGuard + def.Description + "\n\n" + bodyGuard + def.Body
 		cmds["mob-"+name+".md"] = content
 		cmds["codemob-"+name+".md"] = content
 	}

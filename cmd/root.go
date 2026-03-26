@@ -71,6 +71,17 @@ func Execute() error {
 	cmd := os.Args[1]
 	args := os.Args[2:]
 
+	// Reject unknown commands before any side effects (e.g., upgrade refresh).
+	switch cmd {
+	case "new", "list", "ls", "resume", "init", "reinit", "uninstall",
+		"remove", "purge", "path", "open", "info",
+		"switch", "list-others", "check-queue", "queue", "inject-args",
+		"version", "--version", "-v", "help", "--help", "-h":
+		// known command
+	default:
+		return fmt.Errorf("unknown command: %s. Run 'codemob help' for usage.", cmd)
+	}
+
 	// Check for version upgrade on user-facing commands
 	switch cmd {
 	case "switch", "list-others", "check-queue", "queue", "inject-args", "path",
