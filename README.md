@@ -225,7 +225,7 @@ npm install --silent
 bundle install --quiet
 ```
 
-If the script exits non-zero, mob creation stops and the agent is not launched.
+If the script exits non-zero, the mob is cleaned up and the agent is not launched.
 
 ## Under the hood
 

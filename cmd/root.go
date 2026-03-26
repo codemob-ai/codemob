@@ -393,6 +393,9 @@ func cmdNew(args []string) error {
 	}
 
 	if err := runPostCreateScript(cfg, worktreePath); err != nil {
+		if m := mob.FindMob(cfg, filepath.Base(worktreePath)); m != nil {
+			_ = removeMob(root, cfg, m, true)
+		}
 		return err
 	}
 
@@ -791,6 +794,9 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 			return "", "", false, err
 		}
 		if err := runPostCreateScript(cfg, worktreePath); err != nil {
+			if m := mob.FindMob(cfg, filepath.Base(worktreePath)); m != nil {
+				_ = removeMob(root, cfg, m, true)
+			}
 			return "", "", false, err
 		}
 		return worktreePath, agent, false, nil

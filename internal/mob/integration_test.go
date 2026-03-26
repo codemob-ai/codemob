@@ -1591,6 +1591,22 @@ func TestPostCreateScriptFailureBlocksMob(t *testing.T) {
 	if !strings.Contains(out, "post_create_script failed") {
 		t.Errorf("expected error about post_create_script, got: %s", out)
 	}
+
+	// then -> worktree should be cleaned up
+	worktreePath := filepath.Join(repoPath, ".codemob", "mobs", "fail-test")
+	if _, err := os.Stat(worktreePath); err == nil {
+		t.Error("worktree should have been removed after script failure")
+	}
+
+	// then -> mob should not exist in config
+	cfg := readConfig(t, repoPath)
+	mobs, _ := cfg["mobs"].([]interface{})
+	for _, m := range mobs {
+		entry, _ := m.(map[string]interface{})
+		if entry["name"] == "fail-test" {
+			t.Error("mob should have been removed from config after script failure")
+		}
+	}
 }
 
 func TestPostCreateScriptMissingFileError(t *testing.T) {
