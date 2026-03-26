@@ -56,10 +56,10 @@ func (p *progress) Clear() {
 var Version = "dev"
 
 func Execute() error {
-	// Clear stale next action on every invocation (except check-queue which reads it)
+	// Clear stale queue files on every invocation (except check-queue which reads them)
 	if len(os.Args) < 2 || os.Args[1] != "check-queue" {
 		if root, err := mob.FindRepoRoot(); err == nil {
-			mob.ClearQueue(root)
+			mob.ClearAllQueues(root)
 		}
 	}
 
@@ -741,11 +741,16 @@ func cmdCheckNext(_ []string) error {
 		return nil // not in a repo, nothing to do
 	}
 
-	next, err := mob.ReadQueuedAction(root)
+	mobName := mob.CurrentMobName()
+	if mobName == "" {
+		return nil // not in a mob, nothing to do
+	}
+
+	next, err := mob.ReadQueuedAction(root, mobName)
 	if err != nil || next == nil {
 		return nil // no queued action
 	}
-	mob.ClearQueue(root)
+	mob.ClearQueue(root, mobName)
 
 	return executeNextAction(root, next)
 }
@@ -891,7 +896,11 @@ func cmdWriteNext(args []string) error {
 		}
 	}
 
-	return mob.WriteQueuedAction(root, q)
+	currentMob := mob.CurrentMobName()
+	if currentMob == "" {
+		return fmt.Errorf("codemob queue must be run from inside a mob")
+	}
+	return mob.WriteQueuedAction(root, currentMob, q)
 }
 
 // launchAgent spawns the agent as a child process and implements the trampoline loop.
@@ -911,12 +920,13 @@ func launchAgent(root, agent, workdir string, resume bool) error {
 		mobStatus(fmt.Sprintf("Session ended - mob '%s'", filepath.Base(workdir)))
 
 		// Always check for queued action, regardless of how the agent exited
-		next, err := mob.ReadQueuedAction(root)
+		mobName := filepath.Base(workdir)
+		next, err := mob.ReadQueuedAction(root, mobName)
 		if err != nil || next == nil {
 			writeLastMob(workdir)
 			return nil // normal exit
 		}
-		mob.ClearQueue(root)
+		mob.ClearQueue(root, mobName)
 
 		newWorkdir, newAgent, newResume, err := resolveNextAction(root, next)
 		if err != nil {
@@ -1070,9 +1080,10 @@ func spawnAgent(root, binPath string, args []string, workdir string) error {
 		}
 	}()
 
-	// Watch for queue.json - auto-terminate agent when a queued action appears
+	// Watch for per-mob queue file - auto-terminate agent when a queued action appears
 	if root != "" && filepath.IsAbs(root) {
-		queuePath := mob.QueueFilePath(root)
+		mobName := filepath.Base(workdir)
+		queuePath := mob.QueueFilePath(root, mobName)
 		go func() {
 			ticker := time.NewTicker(500 * time.Millisecond)
 			defer ticker.Stop()
