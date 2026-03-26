@@ -17,9 +17,22 @@ type commandDef struct {
 	Body        string // instructions for the agent
 }
 
-const triggerGuard = "IMPORTANT: Only invoke this command when the user explicitly mentions " +
-	"\"mob\" or \"codemob\". Generic requests like \"list\", \"create\", " +
-	"\"remove\", or \"switch\" without mentioning mob/codemob should NOT trigger this.\n\n"
+// Trigger guard: two layers to prevent false skill invocation.
+//
+// Problem: skill names like "mob-new" cause agents to pattern-match generic
+// user input ("new", "list", "drop") to codemob skills. The agent sees the
+// skill name, matches a keyword, and invokes before reading the description.
+//
+// Layer 1 (triggerGuard): prepended to the first line (the description shown
+// in the skill picker). Truncated at ~97 chars, so keep it short and front-loaded.
+// This prevents invocation in most cases.
+const triggerGuard = `MUST HAVE "mob"/"codemob" in user message. `
+
+// Layer 2 (bodyGuard): prepended to the skill body (loaded after invocation).
+// If the agent invokes despite layer 1, this instruction tells it to abort.
+const bodyGuard = `STOP. Re-read the user's message. If it does not literally contain the word "mob" or "codemob", do NOT proceed. Instead, apologize for the false match and ask what they meant.
+
+`
 
 const confirmationGuardLaunch = `IMPORTANT: Before running the codemob queue command, you MUST get explicit confirmation from the user. Tell them: "This will end our current conversation. codemob will automatically close this session and launch the new one. Are you sure?"
 
@@ -34,12 +47,11 @@ Only run the queue command after the user confirms. If they decline, cancel the 
 var slashCommandDefs = map[string]commandDef{
 	"list": {
 		Description: "List all codemob workspaces and their status",
-		Body: triggerGuard +
-			"Run exactly this command using the Bash tool: codemob list\n\nDo NOT use go run, do NOT cd anywhere. Just run: codemob list\n\nDisplay the output to the user.\n",
+		Body: "Run exactly this command using the Bash tool: codemob list\n\nDo NOT use go run, do NOT cd anywhere. Just run: codemob list\n\nDisplay the output to the user.\n",
 	},
 	"new": {
 		Description: "Create a new codemob workspace",
-		Body: triggerGuard + confirmationGuardLaunch + `Ask the user if they want to provide a name or have one auto-generated.
+		Body: confirmationGuardLaunch + `Ask the user if they want to provide a name or have one auto-generated.
 
 If they provide a name, validate it against these rules before running the command:
 - Only letters (a-z, A-Z), numbers, and hyphens allowed (no spaces or special characters)
@@ -58,7 +70,7 @@ Do NOT generate a name yourself — codemob handles name generation.
 	},
 	"switch": {
 		Description: "Switch to a different codemob workspace",
-		Body: triggerGuard + confirmationGuardLaunch + `Run ` + "`codemob list-others`" + ` using the Bash tool.
+		Body: confirmationGuardLaunch + `Run ` + "`codemob list-others`" + ` using the Bash tool.
 
 If the output says "No mobs", tell the user there are no other mobs to switch to and suggest using /mob-new or /codemob-new to create one.
 
@@ -69,7 +81,7 @@ Once they pick one, run ` + "`codemob queue switch <name>`" + ` using the Bash t
 	},
 	"change-agent": {
 		Description: "Switch the current mob to a different AI agent",
-		Body: triggerGuard + confirmationGuardLaunch + `codemob supports claude and codex out of the box.
+		Body: confirmationGuardLaunch + `codemob supports claude and codex out of the box.
 
 Determine the current agent by checking which tool you are (claude or codex). Offer the OTHER agent — do not suggest the one already running.
 
@@ -78,7 +90,7 @@ Once the user confirms which agent they want, run ` + "`codemob queue change-age
 	},
 	"remove": {
 		Description: "Remove a codemob workspace",
-		Body: triggerGuard + `Run ` + "`codemob list`" + ` using the Bash tool and display the results. The current mob is marked with ◀.
+		Body: `Run ` + "`codemob list`" + ` using the Bash tool and display the results. The current mob is marked with ◀.
 
 Ask the user which mob they want to remove.
 
@@ -98,7 +110,7 @@ $CODEMOB_MOB is already set in your environment. There is no need to echo it - t
 	},
 	"drop": {
 		Description: "Remove the current codemob workspace and exit",
-		Body: triggerGuard + confirmationGuardExit + `Run this exact command using the Bash tool:
+		Body: confirmationGuardExit + `Run this exact command using the Bash tool:
 
 ` + "```" + `
 codemob queue remove "$CODEMOB_MOB"
@@ -111,15 +123,15 @@ If the command fails, tell the user: "This command can only be used from within 
 	},
 }
 
-// SlashCommands returns Claude Code slash commands (description as first line, then body).
+// ClaudeSlashCommands returns Claude Code slash commands (description as first line, then body).
 // When multipleAgents is false, the change-agent command is omitted.
-func SlashCommands(multipleAgents bool) map[string]string {
+func ClaudeSlashCommands(multipleAgents bool) map[string]string {
 	cmds := make(map[string]string)
 	for name, def := range slashCommandDefs {
 		if name == "change-agent" && !multipleAgents {
 			continue
 		}
-		content := def.Description + ".\n\n" + def.Body
+		content := triggerGuard + def.Description + "\n\n" + bodyGuard + def.Body
 		cmds["mob-"+name+".md"] = content
 		cmds["codemob-"+name+".md"] = content
 	}
@@ -134,7 +146,7 @@ func CodexPrompts(multipleAgents bool) map[string]string {
 		if name == "change-agent" && !multipleAgents {
 			continue
 		}
-		prompt := fmt.Sprintf("---\ndescription: %s\n---\n\n%s\n", def.Description, def.Body)
+		prompt := fmt.Sprintf("---\ndescription: %s%s\n---\n\n%s%s\n", triggerGuard, def.Description, bodyGuard, def.Body)
 		prompts["mob-"+name+".md"] = prompt
 		prompts["codemob-"+name+".md"] = prompt
 	}
@@ -574,7 +586,7 @@ func setupClaudeCommands(repoRoot string, multipleAgents bool) {
 	os.MkdirAll(commandsDir, 0755)
 
 	installed := 0
-	for name, content := range SlashCommands(multipleAgents) {
+	for name, content := range ClaudeSlashCommands(multipleAgents) {
 		dest := filepath.Join(commandsDir, name)
 		// Check if file exists and has same content
 		existing, err := os.ReadFile(dest)
@@ -595,7 +607,7 @@ func setupClaudeCommands(repoRoot string, multipleAgents bool) {
 	}
 }
 
-func CopySlashCommands(srcRoot, destRoot string) {
+func CopyClaudeSlashCommands(srcRoot, destRoot string) {
 	srcDir := filepath.Join(srcRoot, ".claude", "commands")
 	destDir := filepath.Join(destRoot, ".claude", "commands")
 
@@ -815,7 +827,7 @@ func Uninstall(installDir string) error {
 		info("Removed .codemob/ and all worktrees")
 
 		// Remove slash commands from project
-		for name := range SlashCommands(true) {
+		for name := range ClaudeSlashCommands(true) {
 			os.Remove(filepath.Join(repoRoot, ".claude", "commands", name))
 		}
 		info("Removed codemob slash commands from .claude/commands/")

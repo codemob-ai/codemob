@@ -129,6 +129,8 @@ codemob is early-stage. Optimize for the common user, not power users. Consider 
 
 **Interactive picker:** When a command needs the user to select a mob, use the shared `pickMob()` function in `root.go`. Configure it via `pickerOpts` (marker, default value, root hint, output writer) rather than duplicating the table/prompt logic.
 
+**Command registration:** `root.go` has two switch statements over commands that must stay in sync: the guard/upgrade switch (rejects unknown commands and decides upgrade check) and the dispatch switch (routes to handlers). When adding a new command, add it to both.
+
 **Bug fixes need tests:** When fixing a bug - whether reported by the user or discovered independently - always consider adding a regression test in `integration_test.go`. The test suite is comprehensive and easy to extend. A bug that was worth fixing is worth preventing from coming back.
 
 ## Slash commands
