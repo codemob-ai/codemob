@@ -25,6 +25,13 @@ jobs:
       - name: Run tests
         run: go test ./... -count=1 -v
 
+      - name: Check Homebrew tap token
+        run: |
+          if [ -z "${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}" ]; then
+            echo "::error::HOMEBREW_TAP_GITHUB_TOKEN secret is not set. GoReleaser needs it to push the Homebrew formula to codemob-ai/homebrew-codemob. Add a PAT with repo scope as a repository secret."
+            exit 1
+          fi
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
