@@ -14,7 +14,7 @@ var ValidQueueActions = map[string]bool{
 	"change-agent": true,
 }
 
-const queueFile = ".codemob/queue.json"
+const queuesDir = ".codemob/queues"
 
 // QueuedAction represents a pending action to execute after an agent exits.
 type QueuedAction struct {
@@ -25,17 +25,21 @@ type QueuedAction struct {
 }
 
 // WriteQueuedAction writes an action for the trampoline to pick up.
-func WriteQueuedAction(repoRoot string, action QueuedAction) error {
+func WriteQueuedAction(repoRoot, mobName string, action QueuedAction) error {
 	data, err := json.MarshalIndent(action, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(repoRoot, queueFile), append(data, '\n'), 0644)
+	path := QueueFilePath(repoRoot, mobName)
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, append(data, '\n'), 0644)
 }
 
 // ReadQueuedAction reads and returns the pending action, if any.
-func ReadQueuedAction(repoRoot string) (*QueuedAction, error) {
-	data, err := os.ReadFile(filepath.Join(repoRoot, queueFile))
+func ReadQueuedAction(repoRoot, mobName string) (*QueuedAction, error) {
+	data, err := os.ReadFile(QueueFilePath(repoRoot, mobName))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil // no file = no action
@@ -52,12 +56,17 @@ func ReadQueuedAction(repoRoot string) (*QueuedAction, error) {
 	return &action, nil
 }
 
-// QueueFilePath returns the absolute path to the queue file.
-func QueueFilePath(repoRoot string) string {
-	return filepath.Join(repoRoot, queueFile)
+// QueueFilePath returns the absolute path to the queue file for a given mob.
+func QueueFilePath(repoRoot, mobName string) string {
+	return filepath.Join(repoRoot, queuesDir, mobName+".json")
 }
 
-// ClearQueue removes the queued action file.
-func ClearQueue(repoRoot string) {
-	os.Remove(filepath.Join(repoRoot, queueFile))
+// ClearQueue removes the queued action file for a given mob.
+func ClearQueue(repoRoot, mobName string) {
+	os.Remove(QueueFilePath(repoRoot, mobName))
+}
+
+// ClearAllQueues removes all queued action files.
+func ClearAllQueues(repoRoot string) {
+	os.RemoveAll(filepath.Join(repoRoot, queuesDir))
 }
