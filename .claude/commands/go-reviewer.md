@@ -11,6 +11,8 @@ If the user doesn't specify, ask what they want reviewed.
 
 ## Review process
 
+**IMPORTANT: When invoked, always execute the full review. Never skip, shortcut, or defer with commentary like "my previous review still stands." Every invocation means "do the review now, from scratch."**
+
 1. **Read the diff fresh** - get the full diff of what's being reviewed (e.g. `git diff main...HEAD` for a branch, or `gh pr diff <number>` for a PR). Read every changed file in full, not just the diff - you need surrounding context.
 
 2. **Assess scope** - if the diff is small enough to review confidently in context (most reviews), do the full review yourself. Only if the changes span many files across different areas of the codebase and you risk running low on context for thorough analysis, launch Explore subagents to check for reuse opportunities and existing patterns in the areas you can't read yourself.
