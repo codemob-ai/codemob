@@ -146,7 +146,11 @@ func SaveConfig(repoRoot string, cfg *Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
-	return os.WriteFile(filepath.Join(repoRoot, ConfigFile), append(data, '\n'), 0644)
+	p := filepath.Join(repoRoot, ConfigFile)
+	if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+	return os.WriteFile(p, append(data, '\n'), 0644)
 }
 
 // Reconcile removes mobs from config whose worktree no longer exists on disk.
