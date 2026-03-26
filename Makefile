@@ -5,7 +5,7 @@ PREFIX ?= /opt/homebrew
 BINDIR := $(PREFIX)/bin
 SHAREDIR := $(PREFIX)/share/codemob
 
-.PHONY: build install uninstall test clean
+.PHONY: build install uninstall test clean release-dry-run
 
 build:
 	@echo "Building codemob $(VERSION)..."
@@ -36,4 +36,8 @@ test:
 
 clean:
 	@rm -f codemob
+	@rm -rf dist
 	@echo "  Cleaned build artifacts."
+
+release-dry-run:
+	@goreleaser release --snapshot --clean
