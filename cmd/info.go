@@ -80,14 +80,24 @@ func cmdInfo() error {
 		}
 	}
 
-	// --- Queue ---
-	section("Queue")
-	queuePath := filepath.Join(root, mob.CodemobDir, "queue.json")
-	queueData, err := os.ReadFile(queuePath)
-	if err != nil {
-		kv("queue.json", "(none)")
+	// --- Queues ---
+	section("Queues")
+	queuesPath := filepath.Join(root, mob.CodemobDir, "queues")
+	queueEntries, err := os.ReadDir(queuesPath)
+	if err != nil || len(queueEntries) == 0 {
+		kv("queued actions", "(none)")
 	} else {
-		fmt.Printf("  %s\n", strings.TrimSpace(string(queueData)))
+		for _, e := range queueEntries {
+			if e.IsDir() {
+				continue
+			}
+			data, err := os.ReadFile(filepath.Join(queuesPath, e.Name()))
+			if err != nil {
+				continue
+			}
+			name := strings.TrimSuffix(e.Name(), ".json")
+			kv(name, strings.TrimSpace(string(data)))
+		}
 	}
 
 	// --- Session ---
