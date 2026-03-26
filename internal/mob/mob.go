@@ -1,9 +1,11 @@
 package mob
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -25,11 +27,12 @@ type Mob struct {
 }
 
 type Config struct {
-	DefaultAgent string `json:"default_agent"`
-	BaseBranch   string `json:"base_branch"`
-	RepoRoot     string `json:"repo_root,omitempty"`
-	MobsDirPath  string `json:"mobs_dir,omitempty"`
-	Mobs         []Mob  `json:"mobs"`
+	DefaultAgent    string `json:"default_agent"`
+	BaseBranch      string `json:"base_branch"`
+	RepoRoot        string `json:"repo_root,omitempty"`
+	MobsDirPath     string `json:"mobs_dir,omitempty"`
+	PostCreateScript string `json:"post_create_script"`
+	Mobs            []Mob  `json:"mobs"`
 }
 
 // MobsPath returns the absolute path to the mobs directory.
@@ -276,6 +279,65 @@ func CleanMobsDirContents(mobsDirPath string) {
 	for _, e := range entries {
 		os.RemoveAll(filepath.Join(mobsDirPath, e.Name()))
 	}
+}
+
+// RunPostCreateScript executes the configured post-create script in the given worktree directory.
+// Returns nil if no script is configured. Returns an error if the script fails.
+func RunPostCreateScript(cfg *Config, worktreePath string) error {
+	if cfg.PostCreateScript == "" {
+		return nil
+	}
+
+	scriptPath := cfg.PostCreateScript
+	if !filepath.IsAbs(scriptPath) {
+		scriptPath = filepath.Join(cfg.RepoRoot, scriptPath)
+	}
+
+	info, err := os.Stat(scriptPath)
+	if err != nil {
+		return fmt.Errorf("post_create_script not found: %s", scriptPath)
+	}
+	if info.Mode()&0111 == 0 {
+		return fmt.Errorf("post_create_script is not executable: %s (run chmod +x)", scriptPath)
+	}
+
+	cmd := exec.Command(scriptPath)
+	cmd.Dir = worktreePath
+	cmd.Stdout = newPrefixWriter(os.Stdout, "  │ ")
+	cmd.Stderr = newPrefixWriter(os.Stderr, "  │ ")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("post_create_script failed: %w", err)
+	}
+	return nil
+}
+
+type prefixWriter struct {
+	out     *os.File
+	prefix  string
+	atStart bool
+}
+
+func newPrefixWriter(out *os.File, prefix string) *prefixWriter {
+	return &prefixWriter{out: out, prefix: prefix, atStart: true}
+}
+
+func (w *prefixWriter) Write(p []byte) (int, error) {
+	total := len(p)
+	for len(p) > 0 {
+		if w.atStart {
+			w.out.WriteString(w.prefix)
+			w.atStart = false
+		}
+		nl := bytes.IndexByte(p, '\n')
+		if nl == -1 {
+			w.out.Write(p)
+			break
+		}
+		w.out.Write(p[:nl+1])
+		w.atStart = true
+		p = p[nl+1:]
+	}
+	return total, nil
 }
 
 // FindMob finds a mob by name.

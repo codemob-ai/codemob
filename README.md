@@ -203,6 +203,30 @@ codemob purge                    # remove all
 
 No patches, no plugins, no monkey-patching. Just a shell function pretending to be `claude` and skimming a few arguments off the top.
 
+## Hooks
+
+### `post_create_script`
+
+Run a shell script automatically after every `codemob new`. The script runs with `cwd` set to the new worktree - before the agent launches.
+
+Set it in `.codemob/config.json` (absolute or relative to repo root):
+
+```json
+{
+  "post_create_script": "./scripts/mob-setup.sh"
+}
+```
+
+Example - install dependencies so the agent starts in a working environment:
+
+```sh
+#!/bin/sh
+npm install --silent
+bundle install --quiet
+```
+
+If the script exits non-zero, the mob is cleaned up and the agent is not launched.
+
 ## Under the hood
 
 【🌕】Each mob is a git worktree under `.codemob/mobs/`. Agents are launched as child processes. When you queue an action from inside an agent (via slash command), codemob detects it, terminates the agent, and launches the next session automatically.

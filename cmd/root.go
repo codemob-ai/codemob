@@ -316,6 +316,24 @@ func createMob(root string, cfg *mob.Config, name, agent string) (string, error)
 	return worktreePath, nil
 }
 
+func runPostCreateScript(cfg *mob.Config, worktreePath string) error {
+	if cfg.PostCreateScript == "" {
+		return nil
+	}
+	dim := "\033[2m"
+	reset := "\033[0m"
+	mobStatus("Running post-create script...")
+	fmt.Printf("  %s╭─%s\n", dim, reset)
+	err := mob.RunPostCreateScript(cfg, worktreePath)
+	fmt.Printf("  %s╰─%s\n", dim, reset)
+	if err != nil {
+		mobStatus("Post-create script failed")
+		return err
+	}
+	mobStatus("Post-create script completed")
+	return nil
+}
+
 // removeMob handles the full mob-removal sequence: worktree removal, branch deletion,
 // config update, save, and session file cleanup.
 func removeMob(root string, cfg *mob.Config, m *mob.Mob, force bool) error {
@@ -375,6 +393,13 @@ func cmdNew(args []string) error {
 
 	worktreePath, err := createMob(root, cfg, name, agent)
 	if err != nil {
+		return err
+	}
+
+	if err := runPostCreateScript(cfg, worktreePath); err != nil {
+		if m := mob.FindMob(cfg, filepath.Base(worktreePath)); m != nil {
+			_ = removeMob(root, cfg, m, true)
+		}
 		return err
 	}
 
@@ -772,6 +797,12 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 		if err != nil {
 			return "", "", false, err
 		}
+		if err := runPostCreateScript(cfg, worktreePath); err != nil {
+			if m := mob.FindMob(cfg, filepath.Base(worktreePath)); m != nil {
+				_ = removeMob(root, cfg, m, true)
+			}
+			return "", "", false, err
+		}
 		return worktreePath, agent, false, nil
 
 	case "remove":
@@ -876,6 +907,7 @@ func launchAgent(root, agent, workdir string, resume bool) error {
 			}
 		}
 
+		fmt.Print("\033[2K")
 		mobStatus(fmt.Sprintf("Session ended - mob '%s'", filepath.Base(workdir)))
 
 		// Always check for queued action, regardless of how the agent exited

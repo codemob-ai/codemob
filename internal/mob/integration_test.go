@@ -172,6 +172,15 @@ func runCoreExpectError(t *testing.T, bin, dir string, args ...string) string {
 	return string(out)
 }
 
+// patchConfig reads the config, applies a mutation, and writes it back.
+func patchConfig(t *testing.T, repoPath string, mutate func(map[string]interface{})) {
+	t.Helper()
+	cfg := readConfig(t, repoPath)
+	mutate(cfg)
+	data, _ := json.MarshalIndent(cfg, "", "  ")
+	os.WriteFile(filepath.Join(repoPath, ".codemob", "config.json"), append(data, '\n'), 0644)
+}
+
 // readConfig reads and parses .codemob/config.json from the repo.
 func readConfig(t *testing.T, repoPath string) map[string]interface{} {
 	t.Helper()
@@ -204,6 +213,9 @@ func TestInit(t *testing.T) {
 	}
 	if cfg["base_branch"] != "main" {
 		t.Errorf("expected base_branch=main, got %v", cfg["base_branch"])
+	}
+	if _, ok := cfg["post_create_script"]; !ok {
+		t.Error("expected post_create_script field to be present in config")
 	}
 
 	// then -> .codemob/mobs/ dir should exist
@@ -331,6 +343,30 @@ func TestInitIdempotent(t *testing.T) {
 	cfg := readConfig(t, repoPath)
 	if cfg["base_branch"] != "main" {
 		t.Errorf("expected base_branch=main after reinit, got %v", cfg["base_branch"])
+	}
+}
+
+func TestInitAddsNewFieldsToExistingConfig(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	// given -> remove post_create_script from config (simulates pre-feature config)
+	patchConfig(t, repoPath, func(cfg map[string]interface{}) {
+		delete(cfg, "post_create_script")
+	})
+	cfg := readConfig(t, repoPath)
+	if _, ok := cfg["post_create_script"]; ok {
+		t.Fatal("precondition: post_create_script should have been removed")
+	}
+
+	// when -> run init again (not reinit)
+	initRepo(t, bin, repoPath)
+
+	// then -> field should be present
+	cfg = readConfig(t, repoPath)
+	if _, ok := cfg["post_create_script"]; !ok {
+		t.Error("expected init to add post_create_script to existing config")
 	}
 }
 
@@ -1516,6 +1552,151 @@ func TestPurgeExternalThenListAndNew(t *testing.T) {
 	// then -> should succeed
 	if !strings.Contains(newOut, "fresh") {
 		t.Errorf("expected new mob 'fresh' to be created, got: %s", newOut)
+	}
+}
+
+func TestPostCreateScriptRuns(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	// given -> a post_create_script that creates a marker file
+	scriptPath := filepath.Join(repoPath, "setup.sh")
+	os.WriteFile(scriptPath, []byte("#!/bin/sh\ntouch .setup-done\n"), 0755)
+	patchConfig(t, repoPath, func(cfg map[string]interface{}) {
+		cfg["post_create_script"] = scriptPath
+	})
+
+	// when -> create a mob
+	runCore(t, bin, repoPath, "new", "script-test", "--no-launch")
+
+	// then -> marker file should exist in the worktree
+	worktreePath := filepath.Join(repoPath, ".codemob", "mobs", "script-test")
+	if _, err := os.Stat(filepath.Join(worktreePath, ".setup-done")); err != nil {
+		t.Errorf("post_create_script did not run: marker file missing: %v", err)
+	}
+}
+
+func TestPostCreateScriptRelativePath(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	// given -> a post_create_script with a relative path
+	scriptPath := filepath.Join(repoPath, "setup.sh")
+	os.WriteFile(scriptPath, []byte("#!/bin/sh\ntouch .setup-done\n"), 0755)
+	patchConfig(t, repoPath, func(cfg map[string]interface{}) {
+		cfg["post_create_script"] = "setup.sh"
+	})
+
+	// when -> create a mob
+	runCore(t, bin, repoPath, "new", "rel-path-test", "--no-launch")
+
+	// then -> marker file should exist in the worktree
+	worktreePath := filepath.Join(repoPath, ".codemob", "mobs", "rel-path-test")
+	if _, err := os.Stat(filepath.Join(worktreePath, ".setup-done")); err != nil {
+		t.Errorf("post_create_script with relative path did not run: %v", err)
+	}
+}
+
+func TestPostCreateScriptFailureBlocksMob(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	// given -> a post_create_script that fails
+	scriptPath := filepath.Join(repoPath, "bad-setup.sh")
+	os.WriteFile(scriptPath, []byte("#!/bin/sh\nexit 1\n"), 0755)
+	patchConfig(t, repoPath, func(cfg map[string]interface{}) {
+		cfg["post_create_script"] = scriptPath
+	})
+
+	// when -> create a mob
+	out := runCoreExpectError(t, bin, repoPath, "new", "fail-test", "--no-launch")
+
+	// then -> error message should mention the script
+	if !strings.Contains(out, "post_create_script failed") {
+		t.Errorf("expected error about post_create_script, got: %s", out)
+	}
+
+	// then -> worktree should be cleaned up
+	worktreePath := filepath.Join(repoPath, ".codemob", "mobs", "fail-test")
+	if _, err := os.Stat(worktreePath); err == nil {
+		t.Error("worktree should have been removed after script failure")
+	}
+
+	// then -> mob should not exist in config
+	cfg := readConfig(t, repoPath)
+	mobs, _ := cfg["mobs"].([]interface{})
+	for _, m := range mobs {
+		entry, _ := m.(map[string]interface{})
+		if entry["name"] == "fail-test" {
+			t.Error("mob should have been removed from config after script failure")
+		}
+	}
+}
+
+func TestPostCreateScriptMissingFileError(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	// given -> post_create_script pointing to a nonexistent file
+	patchConfig(t, repoPath, func(cfg map[string]interface{}) {
+		cfg["post_create_script"] = "/nonexistent/setup.sh"
+	})
+
+	// when -> create a mob
+	out := runCoreExpectError(t, bin, repoPath, "new", "missing-script", "--no-launch")
+
+	// then -> error message should mention "not found"
+	if !strings.Contains(out, "not found") {
+		t.Errorf("expected 'not found' error, got: %s", out)
+	}
+}
+
+func TestPostCreateScriptNotExecutableError(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	// given -> a post_create_script without the executable bit
+	scriptPath := filepath.Join(repoPath, "setup.sh")
+	os.WriteFile(scriptPath, []byte("#!/bin/sh\ntouch .setup-done\n"), 0644)
+	patchConfig(t, repoPath, func(cfg map[string]interface{}) {
+		cfg["post_create_script"] = scriptPath
+	})
+
+	// when -> create a mob
+	out := runCoreExpectError(t, bin, repoPath, "new", "noexec-test", "--no-launch")
+
+	// then -> error message should mention "not executable"
+	if !strings.Contains(out, "not executable") {
+		t.Errorf("expected 'not executable' error, got: %s", out)
+	}
+}
+
+func TestPostCreateScriptEmptyIsNoop(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	// given -> no post_create_script configured (empty string default)
+	// when -> create a mob
+	runCore(t, bin, repoPath, "new", "no-script-test", "--no-launch")
+
+	// then -> mob should be created successfully
+	cfg := readConfig(t, repoPath)
+	mobs, _ := cfg["mobs"].([]interface{})
+	found := false
+	for _, m := range mobs {
+		mob, _ := m.(map[string]interface{})
+		if mob["name"] == "no-script-test" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("mob should have been created when post_create_script is empty")
 	}
 }
 
