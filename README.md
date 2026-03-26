@@ -22,6 +22,8 @@
 **Claude** (primary focus) and **Codex** supported out of the box.
 Other terminal-based agents work too - `codemob cd` drops you into the workspace.
 
+> Codex integration works but has rough edges around in-session slash commands (`/mob-new`, `/mob-switch`, etc.). Workspace creation, switching, and lifecycle management from the terminal all work fine. Improving this is a high priority.
+
 </details>
 
 ## How
