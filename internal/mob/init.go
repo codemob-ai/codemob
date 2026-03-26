@@ -681,6 +681,7 @@ func setupRepo(reprompt bool) string {
 	fullyConfigured := cfg.RepoRoot != ""
 
 	if !isNew && !reprompt && fullyConfigured {
+		_ = SaveConfig(root, cfg)
 		info(fmt.Sprintf("Repo already initialized at %s", root))
 		return root
 	}

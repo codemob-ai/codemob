@@ -214,6 +214,9 @@ func TestInit(t *testing.T) {
 	if cfg["base_branch"] != "main" {
 		t.Errorf("expected base_branch=main, got %v", cfg["base_branch"])
 	}
+	if _, ok := cfg["post_create_script"]; !ok {
+		t.Error("expected post_create_script field to be present in config")
+	}
 
 	// then -> .codemob/mobs/ dir should exist
 	if _, err := os.Stat(filepath.Join(repoPath, ".codemob", "mobs")); err != nil {
@@ -340,6 +343,30 @@ func TestInitIdempotent(t *testing.T) {
 	cfg := readConfig(t, repoPath)
 	if cfg["base_branch"] != "main" {
 		t.Errorf("expected base_branch=main after reinit, got %v", cfg["base_branch"])
+	}
+}
+
+func TestInitAddsNewFieldsToExistingConfig(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	// given -> remove post_create_script from config (simulates pre-feature config)
+	patchConfig(t, repoPath, func(cfg map[string]interface{}) {
+		delete(cfg, "post_create_script")
+	})
+	cfg := readConfig(t, repoPath)
+	if _, ok := cfg["post_create_script"]; ok {
+		t.Fatal("precondition: post_create_script should have been removed")
+	}
+
+	// when -> run init again (not reinit)
+	initRepo(t, bin, repoPath)
+
+	// then -> field should be present
+	cfg = readConfig(t, repoPath)
+	if _, ok := cfg["post_create_script"]; !ok {
+		t.Error("expected init to add post_create_script to existing config")
 	}
 }
 
