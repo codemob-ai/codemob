@@ -292,8 +292,12 @@ func RunPostCreateScript(cfg *Config, worktreePath string) error {
 		scriptPath = filepath.Join(cfg.RepoRoot, scriptPath)
 	}
 
-	if _, err := os.Stat(scriptPath); err != nil {
+	info, err := os.Stat(scriptPath)
+	if err != nil {
 		return fmt.Errorf("post_create_script not found: %s", scriptPath)
+	}
+	if info.Mode()&0111 == 0 {
+		return fmt.Errorf("post_create_script is not executable: %s (run chmod +x)", scriptPath)
 	}
 
 	cmd := exec.Command(scriptPath)

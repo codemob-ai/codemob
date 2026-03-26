@@ -1628,6 +1628,27 @@ func TestPostCreateScriptMissingFileError(t *testing.T) {
 	}
 }
 
+func TestPostCreateScriptNotExecutableError(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	// given -> a post_create_script without the executable bit
+	scriptPath := filepath.Join(repoPath, "setup.sh")
+	os.WriteFile(scriptPath, []byte("#!/bin/sh\ntouch .setup-done\n"), 0644)
+	patchConfig(t, repoPath, func(cfg map[string]interface{}) {
+		cfg["post_create_script"] = scriptPath
+	})
+
+	// when -> create a mob
+	out := runCoreExpectError(t, bin, repoPath, "new", "noexec-test", "--no-launch")
+
+	// then -> error message should mention "not executable"
+	if !strings.Contains(out, "not executable") {
+		t.Errorf("expected 'not executable' error, got: %s", out)
+	}
+}
+
 func TestPostCreateScriptEmptyIsNoop(t *testing.T) {
 	bin := buildCore(t)
 	_, repoPath := setupTestRepo(t)
