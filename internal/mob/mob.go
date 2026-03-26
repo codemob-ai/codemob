@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -25,11 +26,12 @@ type Mob struct {
 }
 
 type Config struct {
-	DefaultAgent string `json:"default_agent"`
-	BaseBranch   string `json:"base_branch"`
-	RepoRoot     string `json:"repo_root,omitempty"`
-	MobsDirPath  string `json:"mobs_dir,omitempty"`
-	Mobs         []Mob  `json:"mobs"`
+	DefaultAgent    string `json:"default_agent"`
+	BaseBranch      string `json:"base_branch"`
+	RepoRoot        string `json:"repo_root,omitempty"`
+	MobsDirPath     string `json:"mobs_dir,omitempty"`
+	PostCreateScript string `json:"post_create_script"`
+	Mobs            []Mob  `json:"mobs"`
 }
 
 // MobsPath returns the absolute path to the mobs directory.
@@ -276,6 +278,32 @@ func CleanMobsDirContents(mobsDirPath string) {
 	for _, e := range entries {
 		os.RemoveAll(filepath.Join(mobsDirPath, e.Name()))
 	}
+}
+
+// RunPostCreateScript executes the configured post-create script in the given worktree directory.
+// Returns nil if no script is configured. Returns an error if the script fails.
+func RunPostCreateScript(cfg *Config, worktreePath string) error {
+	if cfg.PostCreateScript == "" {
+		return nil
+	}
+
+	scriptPath := cfg.PostCreateScript
+	if !filepath.IsAbs(scriptPath) {
+		scriptPath = filepath.Join(cfg.RepoRoot, scriptPath)
+	}
+
+	if _, err := os.Stat(scriptPath); err != nil {
+		return fmt.Errorf("post_create_script not found: %s", scriptPath)
+	}
+
+	cmd := exec.Command(scriptPath)
+	cmd.Dir = worktreePath
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("post_create_script failed: %w", err)
+	}
+	return nil
 }
 
 // FindMob finds a mob by name.

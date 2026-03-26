@@ -97,6 +97,7 @@ KNOWN_ISSUES.md         # tracked issues not yet fixed
   "base_branch": "main",
   "repo_root": "/Users/you/repos/android",
   "mobs_dir": "/Users/you/repos/.codemob/android/mobs",
+  "post_create_script": "",
   "mobs": [
     {
       "name": "fix-auth-bug",

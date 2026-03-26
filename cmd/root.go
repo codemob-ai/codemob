@@ -316,6 +316,20 @@ func createMob(root string, cfg *mob.Config, name, agent string) (string, error)
 	return worktreePath, nil
 }
 
+func runPostCreateScript(cfg *mob.Config, worktreePath string) error {
+	if cfg.PostCreateScript == "" {
+		return nil
+	}
+	p := mobProgress("Running post-create script...")
+	err := mob.RunPostCreateScript(cfg, worktreePath)
+	if err != nil {
+		p.Done("Post-create script failed")
+		return err
+	}
+	p.Done("Post-create script completed")
+	return nil
+}
+
 // removeMob handles the full mob-removal sequence: worktree removal, branch deletion,
 // config update, save, and session file cleanup.
 func removeMob(root string, cfg *mob.Config, m *mob.Mob, force bool) error {
@@ -375,6 +389,10 @@ func cmdNew(args []string) error {
 
 	worktreePath, err := createMob(root, cfg, name, agent)
 	if err != nil {
+		return err
+	}
+
+	if err := runPostCreateScript(cfg, worktreePath); err != nil {
 		return err
 	}
 
@@ -770,6 +788,9 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 		}
 		worktreePath, err := createMob(root, cfg, next.Target, agent)
 		if err != nil {
+			return "", "", false, err
+		}
+		if err := runPostCreateScript(cfg, worktreePath); err != nil {
 			return "", "", false, err
 		}
 		return worktreePath, agent, false, nil
