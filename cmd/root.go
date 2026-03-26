@@ -248,7 +248,9 @@ func requireInit() (string, *mob.Config, error) {
 			if len(cfg.Mobs) > 0 {
 				return "", nil, fmt.Errorf("mobs directory %s no longer exists. Run 'codemob reinit' to fix", cfg.MobsDirPath)
 			}
-			os.MkdirAll(cfg.MobsDirPath, 0755)
+			if err := os.MkdirAll(cfg.MobsDirPath, 0755); err != nil {
+				return "", nil, fmt.Errorf("failed to recreate mobs directory %s: %w", cfg.MobsDirPath, err)
+			}
 		}
 	}
 	if removed := mob.Reconcile(root, cfg); len(removed) > 0 {
