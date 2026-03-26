@@ -11,7 +11,7 @@ builds:
     main: .
     binary: codemob
     ldflags:
-      - -s -w -X github.com/codemob-ai/codemob/cmd.Version={{.Version}}
+      - -X github.com/codemob-ai/codemob/cmd.Version={{.Version}}
     goos:
       - darwin
       - linux
@@ -29,7 +29,6 @@ archives:
       - codemob-shell.sh
       - LICENSE
       - README.md
-      - CHANGELOG.md
 
 checksum:
   name_template: "checksums.txt"
