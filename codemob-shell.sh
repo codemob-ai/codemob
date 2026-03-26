@@ -44,7 +44,7 @@ claude() {
       done < <(command codemob inject-args claude 2>/dev/null)
       CODEMOB_MOB="$codemob_mob" command claude "${extra_args[@]}" "$@"
       local ec=$?
-      codemob check-queue 2>/dev/null
+      CODEMOB_MOB="$codemob_mob" codemob check-queue 2>/dev/null
       return $ec
       ;;
   esac
@@ -67,7 +67,7 @@ codex() {
       done < <(command codemob inject-args codex 2>/dev/null)
       CODEMOB_MOB="$codemob_mob" command codex "${extra_args[@]}" "$@"
       local ec=$?
-      codemob check-queue 2>/dev/null
+      CODEMOB_MOB="$codemob_mob" codemob check-queue 2>/dev/null
       return $ec
       ;;
   esac
