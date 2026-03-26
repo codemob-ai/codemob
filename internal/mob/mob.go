@@ -249,6 +249,7 @@ func currentMobNameFromCwd(knownRoot string) string {
 
 // CleanupExternalMobsDir removes an external mobs directory and its empty parent directories.
 // Skips cleanup if the path is inside repoRoot (project-dir mode).
+// Used by uninstall to fully remove the directory tree.
 func CleanupExternalMobsDir(repoRoot, mobsDirPath string) {
 	if mobsDirPath == "" || strings.HasPrefix(mobsDirPath, repoRoot+"/") {
 		return
@@ -259,6 +260,21 @@ func CleanupExternalMobsDir(repoRoot, mobsDirPath string) {
 	grandparent := filepath.Dir(parent)
 	if filepath.Base(grandparent) == ".codemob" {
 		os.Remove(grandparent)
+	}
+}
+
+// CleanMobsDirContents removes everything inside the mobs directory
+// but keeps the directory itself so the configured path remains valid.
+func CleanMobsDirContents(mobsDirPath string) {
+	if mobsDirPath == "" {
+		return
+	}
+	entries, err := os.ReadDir(mobsDirPath)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		os.RemoveAll(filepath.Join(mobsDirPath, e.Name()))
 	}
 }
 

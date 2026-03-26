@@ -1453,6 +1453,38 @@ func TestPurgeExternalMobs(t *testing.T) {
 	}
 }
 
+func TestPurgeExternalThenListAndNew(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepoWithMobsDir(t, bin, repoPath, "2")
+
+	// given -> create a mob, then purge it
+	runCore(t, bin, repoPath, "new", "doomed", "--no-launch")
+	cmd := exec.Command(bin, "purge")
+	cmd.Dir = repoPath
+	cmd.Stdin = strings.NewReader("y\n")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("purge failed: %s\n%s", err, out)
+	}
+
+	// when -> list after purge
+	listOut := runCore(t, bin, repoPath, "list")
+
+	// then -> should succeed with "no mobs" message
+	if !strings.Contains(listOut, "No mobs") {
+		t.Errorf("expected 'No mobs' after purge, got: %s", listOut)
+	}
+
+	// when -> create a new mob after purge
+	newOut := runCore(t, bin, repoPath, "new", "fresh", "--no-launch")
+
+	// then -> should succeed
+	if !strings.Contains(newOut, "fresh") {
+		t.Errorf("expected new mob 'fresh' to be created, got: %s", newOut)
+	}
+}
+
 func TestSlashCommandsCopiedToExternalWorktree(t *testing.T) {
 	bin := buildCore(t)
 	_, repoPath := setupTestRepo(t)

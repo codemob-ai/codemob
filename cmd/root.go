@@ -73,7 +73,7 @@ func Execute() error {
 
 	// Check for version upgrade on user-facing commands
 	switch cmd {
-	case "switch", "list-others", "check-queue", "queue", "inject-args",
+	case "switch", "list-others", "check-queue", "queue", "inject-args", "path",
 		"init", "reinit", "uninstall", "version", "--version", "-v", "help", "--help", "-h":
 		// skip upgrade check
 	default:
@@ -245,7 +245,12 @@ func requireInit() (string, *mob.Config, error) {
 	}
 	if cfg.MobsDirPath != "" {
 		if _, err := os.Stat(cfg.MobsDirPath); err != nil {
-			return "", nil, fmt.Errorf("mobs directory %s no longer exists. Run 'codemob reinit' to fix", cfg.MobsDirPath)
+			if len(cfg.Mobs) > 0 {
+				return "", nil, fmt.Errorf("mobs directory %s no longer exists. Run 'codemob reinit' to fix", cfg.MobsDirPath)
+			}
+			if err := os.MkdirAll(cfg.MobsDirPath, 0755); err != nil {
+				return "", nil, fmt.Errorf("failed to recreate mobs directory %s: %w", cfg.MobsDirPath, err)
+			}
 		}
 	}
 	if removed := mob.Reconcile(root, cfg); len(removed) > 0 {
@@ -644,7 +649,7 @@ func cmdPurge(_ []string) error {
 		fmt.Printf("  %s✗%s Removed '%s'\n", r, rst, m.Name)
 	}
 
-	mob.CleanupExternalMobsDir(root, cfg.MobsDirPath)
+	mob.CleanMobsDirContents(cfg.MobsDirPath)
 
 	cfg.Mobs = nil
 	if err := mob.SaveConfig(root, cfg); err != nil {

@@ -30,9 +30,12 @@ func CheckUpgrade(version, repoRoot string) {
 		return
 	}
 
-	fmt.Println()
-	fmt.Printf("%sUpdated to %s - refreshing setup...%s\n", accent, version, reset)
-	fmt.Println()
+	logOutput = os.Stderr
+	defer func() { logOutput = os.Stdout }()
+
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintf(os.Stderr, "%sUpdated to %s - refreshing setup...%s\n", accent, version, reset)
+	fmt.Fprintln(os.Stderr)
 
 	// Global setup
 	setupGlobalGitignore()
@@ -58,7 +61,7 @@ func CheckUpgrade(version, repoRoot string) {
 	os.MkdirAll(filepath.Dir(vFile), 0755)
 	os.WriteFile(vFile, []byte(version), 0644)
 
-	fmt.Println()
+	fmt.Fprintln(os.Stderr)
 }
 
 // WriteVersion persists the given version to the global version file.

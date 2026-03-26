@@ -173,9 +173,11 @@ func PrintBanner(color string) {
 	fmt.Println()
 }
 
-func info(msg string)   { fmt.Printf("%s✓ %s%s\n", green, msg, reset) }
-func warn(msg string)   { fmt.Printf("%s! %s%s\n", accent, msg, reset) }
-func errMsg(msg string) { fmt.Printf("%s✗ %s%s\n", red, msg, reset) }
+var logOutput = os.Stdout
+
+func info(msg string)   { fmt.Fprintf(logOutput, "%s✓ %s%s\n", green, msg, reset) }
+func warn(msg string)   { fmt.Fprintf(logOutput, "%s! %s%s\n", accent, msg, reset) }
+func errMsg(msg string) { fmt.Fprintf(logOutput, "%s✗ %s%s\n", red, msg, reset) }
 
 // Init performs the full codemob initialization.
 // installDir is the directory where codemob-shell.sh lives.
