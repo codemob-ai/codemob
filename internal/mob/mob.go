@@ -1,6 +1,7 @@
 package mob
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -302,12 +303,41 @@ func RunPostCreateScript(cfg *Config, worktreePath string) error {
 
 	cmd := exec.Command(scriptPath)
 	cmd.Dir = worktreePath
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stdout = newPrefixWriter(os.Stdout, "  │ ")
+	cmd.Stderr = newPrefixWriter(os.Stderr, "  │ ")
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("post_create_script failed: %w", err)
 	}
 	return nil
+}
+
+type prefixWriter struct {
+	out     *os.File
+	prefix  string
+	atStart bool
+}
+
+func newPrefixWriter(out *os.File, prefix string) *prefixWriter {
+	return &prefixWriter{out: out, prefix: prefix, atStart: true}
+}
+
+func (w *prefixWriter) Write(p []byte) (int, error) {
+	total := len(p)
+	for len(p) > 0 {
+		if w.atStart {
+			w.out.WriteString(w.prefix)
+			w.atStart = false
+		}
+		nl := bytes.IndexByte(p, '\n')
+		if nl == -1 {
+			w.out.Write(p)
+			break
+		}
+		w.out.Write(p[:nl+1])
+		w.atStart = true
+		p = p[nl+1:]
+	}
+	return total, nil
 }
 
 // FindMob finds a mob by name.

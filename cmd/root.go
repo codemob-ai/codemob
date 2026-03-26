@@ -320,13 +320,17 @@ func runPostCreateScript(cfg *mob.Config, worktreePath string) error {
 	if cfg.PostCreateScript == "" {
 		return nil
 	}
-	p := mobProgress("Running post-create script...")
+	dim := "\033[2m"
+	reset := "\033[0m"
+	mobStatus("Running post-create script...")
+	fmt.Printf("  %s╭─%s\n", dim, reset)
 	err := mob.RunPostCreateScript(cfg, worktreePath)
+	fmt.Printf("  %s╰─%s\n", dim, reset)
 	if err != nil {
-		p.Done("Post-create script failed")
+		mobStatus("Post-create script failed")
 		return err
 	}
-	p.Done("Post-create script completed")
+	mobStatus("Post-create script completed")
 	return nil
 }
 
@@ -903,6 +907,7 @@ func launchAgent(root, agent, workdir string, resume bool) error {
 			}
 		}
 
+		fmt.Print("\033[2K")
 		mobStatus(fmt.Sprintf("Session ended - mob '%s'", filepath.Base(workdir)))
 
 		// Always check for queued action, regardless of how the agent exited
