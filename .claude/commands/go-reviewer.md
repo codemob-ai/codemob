@@ -47,6 +47,15 @@ Structure your review as:
 ### Summary
 One paragraph on what the changes do and your overall assessment.
 
+### Overengineering assessment
+Before listing any issues, do an explicit overengineering pass on the diff. Ask yourself for each changed area:
+- Is the author solving the actual problem in the simplest way that works?
+- Is there unnecessary abstraction, indirection, or generalization beyond what the current use case needs?
+- Are there defensive checks for scenarios that realistically cannot happen?
+- Is there premature configurability or extensibility that adds complexity without a concrete present-day benefit?
+
+If you spot overengineering, flag it here with specific file/line references and what should be simplified. If the code is appropriately scoped - say so explicitly ("No overengineering concerns"). This section exists because the default tendency is to suggest MORE code, MORE abstractions, MORE safety nets - resist that. The best code is the least code that solves the problem correctly.
+
 ### Issues
 List each issue with:
 - **File and line reference** (e.g. `cmd/root.go:142`)
@@ -54,6 +63,8 @@ List each issue with:
 - **What's wrong** and **why it matters** - be specific
 - **Concrete near-term cost** of not fixing it. "Could cause problems if..." or "worth being aware of" is not sufficient - name the scenario that will actually happen. If you can't name one, don't include the issue.
 - **Suggested fix** if you have one
+
+Before finalizing your issues list, apply the same overengineering lens to your own suggestions. Re-read each `suggestion` and `concern` and ask: "Am I suggesting the author add complexity, abstraction, or defensive code that isn't justified by a concrete present-day problem?" If yes - drop it. Only keep suggestions where the cost of NOT doing it is real and near-term. Your suggestions should make the code simpler or fix actual bugs - never make it more complex.
 
 ### Dropped
 After drafting your issues, re-evaluate each `suggestion` and `concern` one more time. List items you considered but cut, with a one-line reason each. If this section is empty, explain why every issue survived the filter.
