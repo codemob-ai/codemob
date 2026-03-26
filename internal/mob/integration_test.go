@@ -283,6 +283,40 @@ func TestSlashCommandsReferenceValidCommands(t *testing.T) {
 	}
 }
 
+func TestSlashCommandsFirstLineContainsTriggerGuard(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	commandsDir := filepath.Join(repoPath, ".claude", "commands")
+
+	// given -> all mob-* slash command files
+	entries, err := os.ReadDir(commandsDir)
+	if err != nil {
+		t.Fatalf("could not read commands dir: %v", err)
+	}
+
+	guard := "Do NOT invoke unless user explicitly mentions"
+
+	for _, entry := range entries {
+		if !strings.HasPrefix(entry.Name(), "mob-") {
+			continue
+		}
+
+		// when -> read the first line
+		content, err := os.ReadFile(filepath.Join(commandsDir, entry.Name()))
+		if err != nil {
+			t.Fatalf("could not read %s: %v", entry.Name(), err)
+		}
+		firstLine := strings.SplitN(string(content), "\n", 2)[0]
+
+		// then -> first line must contain the trigger guard
+		if !strings.Contains(firstLine, guard) {
+			t.Errorf("%s: first line does not contain trigger guard\n  first line: %s", entry.Name(), firstLine)
+		}
+	}
+}
+
 func TestInitIdempotent(t *testing.T) {
 	bin := buildCore(t)
 	_, repoPath := setupTestRepo(t)
