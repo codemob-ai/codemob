@@ -296,7 +296,7 @@ func TestSlashCommandsFirstLineContainsTriggerGuard(t *testing.T) {
 		t.Fatalf("could not read commands dir: %v", err)
 	}
 
-	guard := "Do NOT invoke unless user explicitly mentions"
+	guard := `MUST HAVE "mob"/"codemob" in user message.`
 
 	for _, entry := range entries {
 		if !strings.HasPrefix(entry.Name(), "mob-") {

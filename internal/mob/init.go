@@ -123,9 +123,9 @@ If the command fails, tell the user: "This command can only be used from within 
 	},
 }
 
-// SlashCommands returns Claude Code slash commands (description as first line, then body).
+// ClaudeSlashCommands returns Claude Code slash commands (description as first line, then body).
 // When multipleAgents is false, the change-agent command is omitted.
-func SlashCommands(multipleAgents bool) map[string]string {
+func ClaudeSlashCommands(multipleAgents bool) map[string]string {
 	cmds := make(map[string]string)
 	for name, def := range slashCommandDefs {
 		if name == "change-agent" && !multipleAgents {
@@ -146,7 +146,7 @@ func CodexPrompts(multipleAgents bool) map[string]string {
 		if name == "change-agent" && !multipleAgents {
 			continue
 		}
-		prompt := fmt.Sprintf("---\ndescription: %s\n---\n\n%s\n", def.Description, def.Body)
+		prompt := fmt.Sprintf("---\ndescription: %s%s\n---\n\n%s%s\n", triggerGuard, def.Description, bodyGuard, def.Body)
 		prompts["mob-"+name+".md"] = prompt
 		prompts["codemob-"+name+".md"] = prompt
 	}
@@ -586,7 +586,7 @@ func setupClaudeCommands(repoRoot string, multipleAgents bool) {
 	os.MkdirAll(commandsDir, 0755)
 
 	installed := 0
-	for name, content := range SlashCommands(multipleAgents) {
+	for name, content := range ClaudeSlashCommands(multipleAgents) {
 		dest := filepath.Join(commandsDir, name)
 		// Check if file exists and has same content
 		existing, err := os.ReadFile(dest)
@@ -607,7 +607,7 @@ func setupClaudeCommands(repoRoot string, multipleAgents bool) {
 	}
 }
 
-func CopySlashCommands(srcRoot, destRoot string) {
+func CopyClaudeSlashCommands(srcRoot, destRoot string) {
 	srcDir := filepath.Join(srcRoot, ".claude", "commands")
 	destDir := filepath.Join(destRoot, ".claude", "commands")
 
@@ -827,7 +827,7 @@ func Uninstall(installDir string) error {
 		info("Removed .codemob/ and all worktrees")
 
 		// Remove slash commands from project
-		for name := range SlashCommands(true) {
+		for name := range ClaudeSlashCommands(true) {
 			os.Remove(filepath.Join(repoRoot, ".claude", "commands", name))
 		}
 		info("Removed codemob slash commands from .claude/commands/")

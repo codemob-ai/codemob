@@ -71,28 +71,20 @@ func Execute() error {
 	cmd := os.Args[1]
 	args := os.Args[2:]
 
-	// Reject unknown commands before any side effects (e.g., upgrade refresh).
+	// Reject unknown commands before any side effects and decide upgrade check.
+	// Keep in sync with the dispatch switch below (see CLAUDE.md).
 	switch cmd {
-	case "new", "list", "ls", "resume", "init", "reinit", "uninstall",
-		"remove", "purge", "path", "open", "info",
-		"switch", "list-others", "check-queue", "queue", "inject-args",
-		"version", "--version", "-v", "help", "--help", "-h":
-		// known command
-	default:
-		return fmt.Errorf("unknown command: %s. Run 'codemob help' for usage.", cmd)
-	}
-
-	// Check for version upgrade on user-facing commands
-	switch cmd {
-	case "switch", "list-others", "check-queue", "queue", "inject-args", "path",
-		"init", "reinit", "uninstall", "version", "--version", "-v", "help", "--help", "-h":
-		// skip upgrade check
-	default:
+	case "new", "list", "ls", "resume", "remove", "purge", "open", "info":
 		repoRoot := ""
 		if root, err := mob.FindRepoRoot(); err == nil {
 			repoRoot = root
 		}
 		mob.CheckUpgrade(Version, repoRoot)
+	case "switch", "list-others", "check-queue", "queue", "inject-args", "path",
+		"init", "reinit", "uninstall", "version", "--version", "-v", "help", "--help", "-h":
+		// internal/setup commands: skip upgrade check
+	default:
+		return fmt.Errorf("unknown command: %s. Run 'codemob help' for usage.", cmd)
 	}
 
 	switch cmd {
@@ -307,7 +299,7 @@ func createMob(root string, cfg *mob.Config, name, agent string) (string, error)
 		return "", err
 	}
 
-	mob.CopySlashCommands(root, worktreePath)
+	mob.CopyClaudeSlashCommands(root, worktreePath)
 
 	cfg.Mobs = append(cfg.Mobs, mob.Mob{
 		Name:      name,
