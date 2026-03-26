@@ -30,7 +30,7 @@ const triggerGuard = `MUST HAVE "mob"/"codemob" in user message. `
 
 // Layer 2 (bodyGuard): prepended to the skill body (loaded after invocation).
 // If the agent invokes despite layer 1, this instruction tells it to abort.
-const bodyGuard = `STOP. Re-read the user's message. If it does not literally contain the word "mob" or "codemob", do NOT proceed. Instead, apologize for the false match and ask what they meant.
+const bodyGuard = `STOP. Re-read the user's message that TRIGGERED this command. If that original message does not literally contain the word "mob" or "codemob", do NOT proceed. Instead, apologize for the false match and ask what they meant. This check applies ONLY to the triggering message - follow-up replies (like "y", "yes", a name, etc.) do not need to contain "mob"/"codemob".
 
 `
 

@@ -1093,7 +1093,7 @@ func spawnAgent(root, binPath string, args []string, workdir string) error {
 					if _, err := os.Stat(queuePath); err == nil {
 						mobStatus("Stopping agent...")
 						if cmd.Process != nil {
-							cmd.Process.Signal(syscall.SIGTERM)
+							cmd.Process.Signal(syscall.SIGINT)
 						}
 						return
 					}
@@ -1107,6 +1107,12 @@ func spawnAgent(root, binPath string, args []string, workdir string) error {
 	err := cmd.Wait()
 	signal.Stop(sigCh)
 	close(done)
+
+	// Drain kitty keyboard protocol stack in case the agent exited without
+	// popping it (e.g. SIGTERM during queue-based switching). This is a no-op
+	// if the protocol was never pushed.
+	fmt.Fprint(os.Stdout, "\033[<10u")
+
 	return err
 }
 
