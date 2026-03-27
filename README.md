@@ -1,4 +1,4 @@
-![codemob](img/banner.png)
+![codemob](media/banner.png)
 
 <p align="center">【🌕】<b>Terminal-agnostic AI agent workflow manager with parallel isolated sessions.</b></p>
 
@@ -30,7 +30,7 @@ Other terminal-based agents work too - `codemob cd` drops you into the workspace
 
 ## How
 
-TBD
+<video src="media/codemob-demo.mp4" controls></video>
 
 ## Examples
 
