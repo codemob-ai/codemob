@@ -15,6 +15,8 @@
 
 【🌕】`codemob` manages the full lifecycle - _create_, _resume_, _list_, _switch_, _clean up_.
 
+**So... if you hate `git worktree` commands and have no interest in switching to a specialized AI IDE - this is probably for you.**
+
 <details>
 <summary>✨ Supported agents</summary>
 <br>
