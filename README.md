@@ -30,7 +30,7 @@ Other terminal-based agents work too - `codemob cd` drops you into the workspace
 
 ## How
 
-https://github.com/user-attachments/assets/827cf7ce-c2b1-433c-b01b-37fd749b85d0
+https://github.com/user-attachments/assets/49efeaaa-a31e-42b7-8565-346a3f62d5f2
 
 ## Examples
 
