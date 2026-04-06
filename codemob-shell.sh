@@ -17,7 +17,8 @@ codemob() {
         echo "Already here."
         return 0
       fi
-      cd "$dir"
+      command codemob clear-queue 2>/dev/null
+      cd "$dir" || return $?
       ;;
     *)  command codemob "$@" ;;
   esac
@@ -42,9 +43,10 @@ claude() {
           *) extra_args+=("$line") ;;
         esac
       done < <(command codemob inject-args claude 2>/dev/null)
+      [ -n "$codemob_mob" ] && command codemob clear-queue 2>/dev/null
       CODEMOB_MOB="$codemob_mob" command claude "${extra_args[@]}" "$@"
       local ec=$?
-      CODEMOB_MOB="$codemob_mob" codemob check-queue 2>/dev/null
+      codemob check-queue 2>/dev/null
       return $ec
       ;;
   esac
@@ -65,9 +67,10 @@ codex() {
           *) extra_args+=("$line") ;;
         esac
       done < <(command codemob inject-args codex 2>/dev/null)
+      [ -n "$codemob_mob" ] && command codemob clear-queue 2>/dev/null
       CODEMOB_MOB="$codemob_mob" command codex "${extra_args[@]}" "$@"
       local ec=$?
-      CODEMOB_MOB="$codemob_mob" codemob check-queue 2>/dev/null
+      codemob check-queue 2>/dev/null
       return $ec
       ;;
   esac

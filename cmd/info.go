@@ -84,6 +84,7 @@ func cmdInfo() error {
 	section("Queues")
 	queuesPath := filepath.Join(root, mob.CodemobDir, "queues")
 	queueEntries, err := os.ReadDir(queuesPath)
+	currentSession := os.Getenv("CODEMOB_SESSION")
 	if err != nil || len(queueEntries) == 0 {
 		kv("queued actions", "(none)")
 	} else {
@@ -96,6 +97,9 @@ func cmdInfo() error {
 				continue
 			}
 			name := strings.TrimSuffix(e.Name(), ".json")
+			if name == currentSession {
+				name += " (current)"
+			}
 			kv(name, strings.TrimSpace(string(data)))
 		}
 	}
