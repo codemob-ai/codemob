@@ -56,13 +56,6 @@ func (p *progress) Clear() {
 var Version = "dev"
 
 func Execute() error {
-	// Clear stale queue files on every invocation (except check-queue which reads them)
-	if len(os.Args) < 2 || os.Args[1] != "check-queue" {
-		if root, err := mob.FindRepoRoot(); err == nil {
-			mob.ClearAllQueues(root)
-		}
-	}
-
 	if len(os.Args) < 2 {
 		printUsage()
 		return nil
@@ -928,6 +921,12 @@ func cmdWriteNext(args []string) error {
 // (keyed by $CODEMOB_SESSION) so resume can default to it.
 func launchAgent(root, agent, workdir string, resume bool) error {
 	for {
+		// Drop any leftover queue file for the mob we're about to launch so a stale
+		// action from an earlier session cannot immediately terminate a fresh run.
+		if root != "" && filepath.IsAbs(root) {
+			mob.ClearQueue(root, filepath.Base(workdir))
+		}
+
 		if err := runAgent(root, agent, workdir, resume); err != nil {
 			// Log non-signal errors (signal exits are normal — user pressed Ctrl+C)
 			if _, ok := err.(*exec.ExitError); !ok {

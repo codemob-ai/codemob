@@ -879,6 +879,35 @@ func TestQueueSwitchRequiresTarget(t *testing.T) {
 	}
 }
 
+func TestInfoDoesNotClearQueuedAction(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "test-mob", "--no-launch")
+
+	cfg := readConfig(t, repoPath)
+	mobsDir, ok := cfg["mobs_dir"].(string)
+	if !ok || mobsDir == "" {
+		t.Fatalf("expected mobs_dir in config, got %v", cfg["mobs_dir"])
+	}
+	mobPath := filepath.Join(mobsDir, "test-mob")
+	queuePath := filepath.Join(repoPath, ".codemob", "queues", "test-mob.json")
+
+	runCore(t, bin, mobPath, "queue", "remove", "@self")
+	if _, err := os.Stat(queuePath); err != nil {
+		t.Fatalf("expected queued action file to exist, got %v", err)
+	}
+
+	out := runCore(t, bin, mobPath, "info")
+
+	if _, err := os.Stat(queuePath); err != nil {
+		t.Fatalf("expected info to preserve queued action file, got %v", err)
+	}
+	if !strings.Contains(out, "\"action\": \"remove\"") {
+		t.Errorf("expected info to show queued remove action, got: %s", out)
+	}
+}
+
 // ─── Agent Flag ──────────────────────────────────────────────────────────────
 
 func TestAgentMissingValue(t *testing.T) {
