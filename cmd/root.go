@@ -350,8 +350,22 @@ func runPostCreateScript(cfg *mob.Config, worktreePath string) error {
 	return nil
 }
 
-// removeMob handles the full mob-removal sequence: worktree removal, branch deletion,
-// config update, save, and session file cleanup.
+func confirmRemove(name string) bool {
+	r := mob.ColorRed
+	rst := mob.ColorReset
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintf(os.Stderr, "  %s⚠ DESTRUCTIVE OPERATION%s\n", r, rst)
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintf(os.Stderr, "  This will permanently delete mob '%s'.\n", name)
+	fmt.Fprintf(os.Stderr, "  Any %suncommitted or unpushed changes%s will be %spermanently lost%s.\n", r, rst, r, rst)
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintf(os.Stderr, "  %sThis cannot be undone.%s\n", r, rst)
+	fmt.Fprint(os.Stderr, "\n  Are you sure? [y/N]: ")
+	var input string
+	fmt.Scanln(&input)
+	return input == "y" || input == "Y" || input == "yes"
+}
+
 func removeMob(root string, cfg *mob.Config, m *mob.Mob, force bool) error {
 	worktreePath := mob.MobPath(root, cfg, m.Name)
 	if _, err := os.Stat(worktreePath); err == nil {
@@ -599,11 +613,7 @@ func cmdRemove(args []string) error {
 	}
 
 	if !force {
-		fmt.Fprintf(os.Stderr, "  \033[33m!\033[0m This will permanently delete mob '%s'. Uncommitted/unpushed changes will be lost.\n", m.Name)
-		fmt.Fprint(os.Stderr, "  Continue? [y/N]: ")
-		var input string
-		fmt.Scanln(&input)
-		if input != "y" && input != "Y" && input != "yes" {
+		if !confirmRemove(m.Name) {
 			fmt.Println("Cancelled.")
 			return nil
 		}
@@ -826,12 +836,7 @@ func resolveNextAction(root string, next *mob.QueuedAction) (workdir, agent stri
 		if m == nil {
 			return "", "", false, fmt.Errorf("mob '%s' not found", name)
 		}
-		fmt.Fprintln(os.Stderr)
-		fmt.Fprintf(os.Stderr, "  \033[33m!\033[0m This will permanently delete mob '%s'. Uncommitted/unpushed changes will be lost.\n", m.Name)
-		fmt.Fprint(os.Stderr, "  Continue? [y/N]: ")
-		var input string
-		fmt.Scanln(&input)
-		if input != "y" && input != "Y" && input != "yes" {
+		if !confirmRemove(m.Name) {
 			fmt.Println("  Cancelled.")
 			return "", "", false, nil
 		}
