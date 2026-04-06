@@ -160,9 +160,25 @@ type pickerOpts struct {
 	markerName string   // mob name to mark with ◀ (e.g., last session mob)
 	defaultVal string   // pre-filled default shown in prompt bracket; enter selects it
 	showRoot   bool     // show "0 — repo root" hint (for cd/path)
+	useSession bool     // auto-populate markerName/defaultVal from session's last mob
 }
 
 func pickMob(cfg *mob.Config, opts pickerOpts) (string, error) {
+	if opts.useSession && opts.repoRoot != "" {
+		lastMob := readLastMob(opts.repoRoot)
+		if lastMob != "" && mob.FindMob(cfg, lastMob) == nil {
+			lastMob = ""
+		}
+		if lastMob != "" {
+			if opts.markerName == "" {
+				opts.markerName = lastMob
+			}
+			if opts.defaultVal == "" {
+				opts.defaultVal = lastMob
+			}
+		}
+	}
+
 	if len(cfg.Mobs) == 0 {
 		return "", fmt.Errorf("no mobs. Create one with: codemob new")
 	}
@@ -469,15 +485,10 @@ func cmdResume(args []string) error {
 	}
 
 	if name == "" {
-		lastMob := readLastMob(root)
-		if lastMob != "" && mob.FindMob(cfg, lastMob) == nil {
-			lastMob = ""
-		}
 		var err error
 		name, err = pickMob(cfg, pickerOpts{
 			repoRoot:   root,
-			markerName: lastMob,
-			defaultVal: lastMob,
+			useSession: true,
 		})
 		if err != nil {
 			return err
@@ -525,15 +536,10 @@ func cmdOpen(args []string) error {
 	}
 
 	if name == "" {
-		lastMob := readLastMob(root)
-		if lastMob != "" && mob.FindMob(cfg, lastMob) == nil {
-			lastMob = ""
-		}
 		var err error
 		name, err = pickMob(cfg, pickerOpts{
 			repoRoot:   root,
-			markerName: lastMob,
-			defaultVal: lastMob,
+			useSession: true,
 		})
 		if err != nil {
 			return err
@@ -712,9 +718,10 @@ func cmdPath(args []string) error {
 		inMob := mob.CurrentMobName() != ""
 		var err error
 		name, err = pickMob(cfg, pickerOpts{
-			repoRoot: root,
-			out:      os.Stderr,
-			showRoot: inMob,
+			repoRoot:   root,
+			out:        os.Stderr,
+			showRoot:   inMob,
+			useSession: true,
 		})
 		if err != nil {
 			return err
