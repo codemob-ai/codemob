@@ -883,6 +883,13 @@ func cmdWriteNext(args []string) error {
 		target = args[1]
 	}
 
+	if target == "@self" {
+		target = mob.CurrentMobName()
+		if target == "" {
+			return fmt.Errorf("@self: not inside a mob")
+		}
+	}
+
 	// Validate: switch, remove, and change-agent require a target
 	if target == "" && (action == "switch" || action == "remove" || action == "change-agent") {
 		return fmt.Errorf("codemob queue %s requires a target", action)
