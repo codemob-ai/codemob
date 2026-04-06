@@ -16,7 +16,8 @@
       "Bash(git -C * push:*)",
       "Bash(git -C * log:*)",
       "Bash(git -C * diff:*)",
-      "Bash(git -C * stash:*)"
+      "Bash(git -C * stash:*)",
+      "Bash(gh issue:*)"
     ]
   }
 }
