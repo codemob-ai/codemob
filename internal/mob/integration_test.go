@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -26,12 +27,12 @@ func buildCore(t *testing.T) string {
 // repoRoot returns the root of the codemob source repo.
 func repoRoot(t *testing.T) string {
 	t.Helper()
-	// We're in internal/mob/, go up two levels
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("failed to determine test file path")
 	}
-	return filepath.Join(wd, "..", "..")
+	// integration_test.go lives in internal/mob/
+	return filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
 }
 
 // setupTestRepo creates a temp HOME and a git repo inside it, returns (home, repoPath).
