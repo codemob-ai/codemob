@@ -94,7 +94,14 @@ Once the user confirms which agent they want, run ` + "`codemob queue change-age
 
 Ask the user which mob they want to remove.
 
-If they choose a DIFFERENT mob (not the one marked with ◀), run ` + "`codemob remove <name>`" + ` directly. No session confirmation needed since the current session stays alive.
+If they choose a DIFFERENT mob (not the one marked with ◀):
+
+This is a destructive operation. Before proceeding, warn the user:
+"This will permanently delete mob '<name>'. Any unstaged, uncommitted, or unpushed changes in that workspace will be permanently lost. Are you sure?"
+
+Only proceed after the user confirms. If they decline, cancel the operation.
+
+Once confirmed, run ` + "`codemob remove --force <name>`" + ` using the Bash tool.
 
 If they choose the CURRENT mob (marked with ◀):
 
