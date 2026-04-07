@@ -927,6 +927,21 @@ func TestClearQueueRequiresSession(t *testing.T) {
 	}
 }
 
+func TestCheckQueueWithoutSessionIsNoOp(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "test-mob", "--no-launch")
+
+	cfg := readConfig(t, repoPath)
+	mobPath := filepath.Join(cfg["mobs_dir"].(string), "test-mob")
+
+	out := runCore(t, bin, mobPath, "check-queue")
+	if strings.TrimSpace(out) != "" {
+		t.Errorf("expected check-queue with no session to be silent, got: %s", out)
+	}
+}
+
 func TestInfoDoesNotClearQueuedAction(t *testing.T) {
 	bin := buildCore(t)
 	_, repoPath := setupTestRepo(t)

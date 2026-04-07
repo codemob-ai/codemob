@@ -753,7 +753,7 @@ func cmdCheckNext(_ []string) error {
 	}
 	sessionID, err := mob.QueueSessionID()
 	if err != nil {
-		return err
+		return nil // no session queue available, nothing to do
 	}
 
 	next, err := mob.ReadQueuedAction(root, sessionID)
