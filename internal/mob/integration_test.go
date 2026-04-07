@@ -1731,3 +1731,39 @@ func TestSlashCommandsCopiedToExternalWorktree(t *testing.T) {
 		}
 	}
 }
+
+func TestNewCdPrintsWorktreePath(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+
+	// when
+	out := runCore(t, bin, repoPath, "new", "cd-test", "--cd")
+
+	// then -> last line of output should be the worktree path
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	lastLine := lines[len(lines)-1]
+	worktreePath := filepath.Join(repoPath, ".codemob", "mobs", "cd-test")
+	if clean, err := filepath.EvalSymlinks(worktreePath); err == nil {
+		worktreePath = clean
+	}
+	if lastLine != worktreePath {
+		t.Errorf("expected last line to be worktree path %q, got %q", worktreePath, lastLine)
+	}
+
+	// then -> worktree should exist on disk
+	if _, err := os.Stat(worktreePath); err != nil {
+		t.Errorf("worktree not created: %v", err)
+	}
+
+	// then -> config should have the mob
+	cfg := readConfig(t, repoPath)
+	mobs := cfg["mobs"].([]interface{})
+	if len(mobs) != 1 {
+		t.Fatalf("expected 1 mob, got %d", len(mobs))
+	}
+	mob := mobs[0].(map[string]interface{})
+	if mob["name"] != "cd-test" {
+		t.Errorf("expected mob name=cd-test, got %v", mob["name"])
+	}
+}

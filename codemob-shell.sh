@@ -19,6 +19,21 @@ codemob() {
       fi
       cd "$dir"
       ;;
+    new)
+      local has_cd=false
+      for arg in "$@"; do
+        [ "$arg" = "--cd" ] && has_cd=true
+      done
+      if $has_cd; then
+        local out dir
+        out="$(command codemob "$@")" || return $?
+        dir="$(echo "$out" | tail -1)"
+        echo "$out" | sed '$d'
+        cd "$dir"
+      else
+        command codemob "$@"
+      fi
+      ;;
     *)  command codemob "$@" ;;
   esac
 }

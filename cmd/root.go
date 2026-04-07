@@ -401,11 +401,14 @@ func cmdNew(args []string) error {
 	name := ""
 	agent := cfg.DefaultAgent
 	noLaunch := false
+	cdOnly := false
 
 	for i := 0; i < len(args); i++ {
 		switch {
 		case args[i] == "--no-launch":
 			noLaunch = true
+		case args[i] == "--cd":
+			cdOnly = true
 		case args[i] == "--agent":
 			if i+1 >= len(args) {
 				return fmt.Errorf("--agent requires a value (e.g., --agent codex)")
@@ -433,6 +436,10 @@ func cmdNew(args []string) error {
 		return err
 	}
 
+	if cdOnly {
+		fmt.Println(worktreePath)
+		return nil
+	}
 	if !noLaunch {
 		return launchAgent(root, agent, worktreePath, false)
 	}
