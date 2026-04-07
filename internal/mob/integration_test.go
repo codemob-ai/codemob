@@ -176,9 +176,11 @@ func runCoreExpectError(t *testing.T, bin, dir string, args ...string) string {
 
 // runShell executes a bash command in the given directory with the built codemob
 // binary prepended to PATH so the sourced shell wrapper can call `command codemob`.
+// Use a non-login shell so test HOME rc files written by `init` do not interfere
+// with the script under test.
 func runShell(t *testing.T, bin, dir, script string) string {
 	t.Helper()
-	cmd := exec.Command("bash", "-lc", script)
+	cmd := exec.Command("bash", "-c", script)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "PATH="+filepath.Dir(bin)+":"+os.Getenv("PATH"))
 	out, err := cmd.CombinedOutput()
