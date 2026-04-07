@@ -7,8 +7,8 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
-	"syscall"
 	"strings"
+	"syscall"
 	"text/tabwriter"
 	"time"
 
@@ -56,13 +56,6 @@ func (p *progress) Clear() {
 var Version = "dev"
 
 func Execute() error {
-	// Clear stale queue files on every invocation (except check-queue which reads them)
-	if len(os.Args) < 2 || os.Args[1] != "check-queue" {
-		if root, err := mob.FindRepoRoot(); err == nil {
-			mob.ClearAllQueues(root)
-		}
-	}
-
 	if len(os.Args) < 2 {
 		printUsage()
 		return nil
@@ -80,7 +73,7 @@ func Execute() error {
 			repoRoot = root
 		}
 		mob.CheckUpgrade(Version, repoRoot)
-	case "switch", "list-others", "check-queue", "queue", "inject-args", "path",
+	case "switch", "list-others", "check-queue", "queue", "clear-queue", "inject-args", "path",
 		"init", "reinit", "uninstall", "version", "--version", "-v", "help", "--help", "-h":
 		// internal/setup commands: skip upgrade check
 	default:
@@ -121,6 +114,8 @@ func Execute() error {
 		return cmdCheckNext(args)
 	case "queue":
 		return cmdWriteNext(args)
+	case "clear-queue":
+		return cmdClearQueue(args)
 	case "inject-args":
 		return cmdInjectArgs(args)
 
@@ -523,7 +518,6 @@ func cmdResume(args []string) error {
 	return nil
 }
 
-
 func cmdOpen(args []string) error {
 	root, cfg, err := requireInit()
 	if err != nil {
@@ -757,19 +751,39 @@ func cmdCheckNext(_ []string) error {
 	if err != nil {
 		return nil // not in a repo, nothing to do
 	}
-
-	mobName := mob.CurrentMobName()
-	if mobName == "" {
-		return nil // not in a mob, nothing to do
+	sessionID, err := mob.QueueSessionID()
+	if err != nil {
+		return nil // no session queue available, nothing to do
 	}
 
-	next, err := mob.ReadQueuedAction(root, mobName)
+	next, err := mob.ReadQueuedAction(root, sessionID)
 	if err != nil || next == nil {
 		return nil // no queued action
 	}
-	mob.ClearQueue(root, mobName)
+	mob.ClearQueue(root, sessionID)
 
 	return executeNextAction(root, next)
+}
+
+func cmdClearQueue(args []string) error {
+	if len(args) > 0 && strings.HasPrefix(args[0], "--") {
+		return fmt.Errorf("unknown flag for clear-queue: %s", args[0])
+	}
+	if len(args) > 0 {
+		return fmt.Errorf("usage: codemob clear-queue")
+	}
+
+	root, err := mob.FindRepoRoot()
+	if err != nil {
+		return nil
+	}
+	sessionID, err := mob.QueueSessionID()
+	if err != nil {
+		return err
+	}
+
+	mob.ClearQueue(root, sessionID)
+	return nil
 }
 
 // resolveNextAction resolves a next action to a workdir, agent, and resume flag.
@@ -863,7 +877,6 @@ func executeNextAction(root string, next *mob.QueuedAction) error {
 	return launchAgent(root, agent, workdir, resume)
 }
 
-
 // cmdWriteNext writes a next action for the trampoline.
 // Used by slash commands: codemob queue switch <mob-name>
 func cmdWriteNext(args []string) error {
@@ -881,6 +894,13 @@ func cmdWriteNext(args []string) error {
 	target := ""
 	if len(args) >= 2 {
 		target = args[1]
+	}
+
+	if target == "@self" {
+		target = mob.CurrentMobName()
+		if target == "" {
+			return fmt.Errorf("@self: not inside a mob")
+		}
 	}
 
 	// Validate: switch, remove, and change-agent require a target
@@ -912,7 +932,11 @@ func cmdWriteNext(args []string) error {
 	if currentMob == "" {
 		return fmt.Errorf("codemob queue must be run from inside a mob")
 	}
-	return mob.WriteQueuedAction(root, currentMob, q)
+	sessionID, err := mob.QueueSessionID()
+	if err != nil {
+		return err
+	}
+	return mob.WriteQueuedAction(root, sessionID, q)
 }
 
 // launchAgent spawns the agent as a child process and implements the trampoline loop.
@@ -920,8 +944,19 @@ func cmdWriteNext(args []string) error {
 // On final exit, writes the last active mob name to .codemob/sessions/<session-id>
 // (keyed by $CODEMOB_SESSION) so resume can default to it.
 func launchAgent(root, agent, workdir string, resume bool) error {
+	sessionID, err := mob.QueueSessionID()
+	if err != nil {
+		sessionID = ""
+	}
+
 	for {
-		if err := runAgent(root, agent, workdir, resume); err != nil {
+		// Drop any leftover queue file for the session we're about to launch so a
+		// stale action from an earlier run cannot immediately terminate a fresh one.
+		if sessionID != "" && root != "" && filepath.IsAbs(root) {
+			mob.ClearQueue(root, sessionID)
+		}
+
+		if err := runAgent(root, sessionID, agent, workdir, resume); err != nil {
 			// Log non-signal errors (signal exits are normal — user pressed Ctrl+C)
 			if _, ok := err.(*exec.ExitError); !ok {
 				fmt.Fprintf(os.Stderr, "  [codemob] agent error: %v\n", err)
@@ -932,13 +967,16 @@ func launchAgent(root, agent, workdir string, resume bool) error {
 		mobStatus(fmt.Sprintf("Session ended - mob '%s'", filepath.Base(workdir)))
 
 		// Always check for queued action, regardless of how the agent exited
-		mobName := filepath.Base(workdir)
-		next, err := mob.ReadQueuedAction(root, mobName)
+		if sessionID == "" {
+			writeLastMob(workdir)
+			return nil // normal exit with no queue session available
+		}
+		next, err := mob.ReadQueuedAction(root, sessionID)
 		if err != nil || next == nil {
 			writeLastMob(workdir)
 			return nil // normal exit
 		}
-		mob.ClearQueue(root, mobName)
+		mob.ClearQueue(root, sessionID)
 
 		newWorkdir, newAgent, newResume, err := resolveNextAction(root, next)
 		if err != nil {
@@ -985,14 +1023,14 @@ func writeLastMob(workdir string) {
 
 // runAgent spawns the agent process and waits for it to exit.
 // If resume is true and the agent fails (e.g., no session to continue), falls back to a new session.
-func runAgent(root, agent, workdir string, resume bool) error {
+func runAgent(root, sessionID, agent, workdir string, resume bool) error {
 	binPath, resumeArgs, newArgs, err := agentArgs(agent, root)
 	if err != nil {
 		return err
 	}
 
 	if resume {
-		err := spawnAgent(root, binPath, resumeArgs, workdir)
+		err := spawnAgent(root, sessionID, binPath, resumeArgs, workdir)
 		if err == nil {
 			return nil
 		}
@@ -1005,7 +1043,7 @@ func runAgent(root, agent, workdir string, resume bool) error {
 		mobStatus("No previous session found, starting new session")
 	}
 
-	return spawnAgent(root, binPath, newArgs, workdir)
+	return spawnAgent(root, sessionID, binPath, newArgs, workdir)
 }
 
 func cmdInjectArgs(args []string) error {
@@ -1065,7 +1103,7 @@ func agentArgs(agent, repoRoot string) (binPath string, resumeArgs, newArgs []st
 	return
 }
 
-func spawnAgent(root, binPath string, args []string, workdir string) error {
+func spawnAgent(root, sessionID, binPath string, args []string, workdir string) error {
 	cmd := exec.Command(binPath, args...)
 	cmd.Dir = workdir
 	cmd.Stdin = os.Stdin
@@ -1092,10 +1130,10 @@ func spawnAgent(root, binPath string, args []string, workdir string) error {
 		}
 	}()
 
-	// Watch for per-mob queue file - auto-terminate agent when a queued action appears
-	if root != "" && filepath.IsAbs(root) {
-		mobName := filepath.Base(workdir)
-		queuePath := mob.QueueFilePath(root, mobName)
+	// Watch for the current session's queue file - auto-terminate the agent when a
+	// queued action appears.
+	if sessionID != "" && root != "" && filepath.IsAbs(root) {
+		queuePath := mob.QueueFilePath(root, sessionID)
 		go func() {
 			ticker := time.NewTicker(500 * time.Millisecond)
 			defer ticker.Stop()

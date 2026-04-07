@@ -20,8 +20,8 @@ Key ideas:
 ## Architecture
 
 Two layers:
-- **`codemob`** (Go binary) — all logic: config management, git operations, reconciliation, JSON. Launches agents as child processes (`exec.Command` with `cmd.Dir`), implements a trampoline loop that checks `queue.json` after agent exit for seamless switching.
-- **`codemob-shell.sh`** (bash) — sourced into shell via `.zshrc`. Defines `mob` alias and `claude`/`codex` wrappers that intercept `--*-mob`/`--*-codemob` flags. Also checks `queue.json` after agent exit for the shell-launched path. Preserves agent exit codes.
+- **`codemob`** (Go binary) — all logic: config management, git operations, reconciliation, JSON. Launches agents as child processes (`exec.Command` with `cmd.Dir`), implements a trampoline loop that checks the current session queue after agent exit for seamless switching.
+- **`codemob-shell.sh`** (bash) — sourced into shell via `.zshrc`. Defines `mob` alias and `claude`/`codex` wrappers that intercept `--*-mob`/`--*-codemob` flags. Also checks the current session queue after agent exit for the shell-launched path. Preserves agent exit codes.
 
 ## CLI interface
 
@@ -40,6 +40,13 @@ codemob remove <name>       # remove a mob (accepts name or index)
 codemob purge               # remove all mobs (with confirmation)
 codemob info                # show diagnostic information
 codemob uninstall           # remove all codemob setup (global + local)
+```
+
+Internal commands used by shell/slash-command flows:
+```bash
+codemob queue <action> [target]  # write the current session's queued action
+codemob check-queue              # consume the current session's queued action
+codemob clear-queue              # clear the current session's queued action
 ```
 
 Options:
@@ -81,7 +88,7 @@ internal/
   git/git.go            # git command wrappers
   mob/mob.go            # data model, config, reconciliation, name validation
   mob/init.go           # init/uninstall, slash commands, Codex prompts, Claude permissions
-  mob/next.go           # queue.json read/write/clear
+  mob/next.go           # session queue read/write/clear
   mob/names.go          # random name generation (adjective-fruit)
   mob/integration_test.go
 Makefile                # build/install/test
@@ -111,14 +118,18 @@ KNOWN_ISSUES.md         # tracked issues not yet fixed
 
 **Config stores explicit absolute paths.** Both `repo_root` and `mobs_dir` are always set to absolute paths during init. If reality diverges (repo moved, mobs dir deleted), codemob fails with a hard error telling the user to reinit. This is intentional - we accept that repo moves require reinit rather than adding dynamic resolution or fallback logic.
 
-`.codemob/queue.json` (transient, written by slash commands):
+`.codemob/queues/<session-id>.json` (transient, written by slash commands / internal queue commands; one file per `CODEMOB_SESSION`):
 ```json
 {
   "action": "switch",
-  "target": "other-mob",
-  "mob": ""
+  "target": "other-mob"
 }
 ```
+
+`target`, `mob`, and `agent` are action-dependent fields:
+- `target` is used by `switch`, `remove`, and `change-agent`
+- `mob` is used by `change-agent` to record the current mob
+- `agent` is used by `new` so queued creation preserves the current agent
 
 ## Design philosophy
 
@@ -145,6 +156,8 @@ The Go binary is the primary interface — it handles everything including agent
 ## Session tracking (CODEMOB_SESSION)
 
 `codemob-shell.sh` sets `$CODEMOB_SESSION` (a UUID) once per terminal window at shell startup. The Go binary uses this as a file key under `.codemob/sessions/<uuid>` to track the last active mob per terminal.
+
+The queue system is also session-scoped: queued actions live under `.codemob/queues/<uuid>.json`, keyed by the same `CODEMOB_SESSION`. This is why queue features intentionally fail if `CODEMOB_SESSION` is missing instead of inventing a fallback.
 
 This enables `codemob resume` (no name) to default to the last-used mob in that terminal — even with parallel sessions in different terminals.
 

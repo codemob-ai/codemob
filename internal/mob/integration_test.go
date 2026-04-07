@@ -2,9 +2,11 @@ package mob_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -25,12 +27,12 @@ func buildCore(t *testing.T) string {
 // repoRoot returns the root of the codemob source repo.
 func repoRoot(t *testing.T) string {
 	t.Helper()
-	// We're in internal/mob/, go up two levels
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("failed to determine test file path")
 	}
-	return filepath.Join(wd, "..", "..")
+	// integration_test.go lives in internal/mob/
+	return filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
 }
 
 // setupTestRepo creates a temp HOME and a git repo inside it, returns (home, repoPath).
@@ -172,6 +174,22 @@ func runCoreExpectError(t *testing.T, bin, dir string, args ...string) string {
 	return string(out)
 }
 
+// runShell executes a bash command in the given directory with the built codemob
+// binary prepended to PATH so the sourced shell wrapper can call `command codemob`.
+// Use a non-login shell so test HOME rc files written by `init` do not interfere
+// with the script under test.
+func runShell(t *testing.T, bin, dir, script string) string {
+	t.Helper()
+	cmd := exec.Command("bash", "-c", script)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "PATH="+filepath.Dir(bin)+":"+os.Getenv("PATH"))
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("shell command failed: %s\n%s", err, out)
+	}
+	return string(out)
+}
+
 // patchConfig reads the config, applies a mutation, and writes it back.
 func patchConfig(t *testing.T, repoPath string, mutate func(map[string]interface{})) {
 	t.Helper()
@@ -195,6 +213,9 @@ func readConfig(t *testing.T, repoPath string) map[string]interface{} {
 	return cfg
 }
 
+func queuePath(repoPath, sessionID string) string {
+	return filepath.Join(repoPath, ".codemob", "queues", sessionID+".json")
+}
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
@@ -876,6 +897,261 @@ func TestQueueSwitchRequiresTarget(t *testing.T) {
 	// then
 	if !strings.Contains(out, "requires a target") {
 		t.Errorf("expected target required error, got: %s", out)
+	}
+}
+
+func TestQueueRequiresSession(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "test-mob", "--no-launch")
+
+	cfg := readConfig(t, repoPath)
+	mobPath := filepath.Join(cfg["mobs_dir"].(string), "test-mob")
+
+	out := runCoreExpectError(t, bin, mobPath, "queue", "remove", "@self")
+	if !strings.Contains(out, "CODEMOB_SESSION") {
+		t.Errorf("expected missing session error, got: %s", out)
+	}
+}
+
+func TestClearQueueRequiresSession(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "test-mob", "--no-launch")
+
+	cfg := readConfig(t, repoPath)
+	mobPath := filepath.Join(cfg["mobs_dir"].(string), "test-mob")
+
+	out := runCoreExpectError(t, bin, mobPath, "clear-queue")
+	if !strings.Contains(out, "CODEMOB_SESSION") {
+		t.Errorf("expected missing session error, got: %s", out)
+	}
+}
+
+func TestCheckQueueWithoutSessionIsNoOp(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "test-mob", "--no-launch")
+
+	cfg := readConfig(t, repoPath)
+	mobPath := filepath.Join(cfg["mobs_dir"].(string), "test-mob")
+
+	out := runCore(t, bin, mobPath, "check-queue")
+	if strings.TrimSpace(out) != "" {
+		t.Errorf("expected check-queue with no session to be silent, got: %s", out)
+	}
+}
+
+func TestInfoDoesNotClearQueuedAction(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "test-mob", "--no-launch")
+	sessionID := "queue-info"
+	t.Setenv("CODEMOB_SESSION", sessionID)
+
+	cfg := readConfig(t, repoPath)
+	mobsDir, ok := cfg["mobs_dir"].(string)
+	if !ok || mobsDir == "" {
+		t.Fatalf("expected mobs_dir in config, got %v", cfg["mobs_dir"])
+	}
+	mobPath := filepath.Join(mobsDir, "test-mob")
+	queuePath := queuePath(repoPath, sessionID)
+
+	runCore(t, bin, mobPath, "queue", "remove", "@self")
+	if _, err := os.Stat(queuePath); err != nil {
+		t.Fatalf("expected queued action file to exist, got %v", err)
+	}
+
+	out := runCore(t, bin, mobPath, "info")
+
+	if _, err := os.Stat(queuePath); err != nil {
+		t.Fatalf("expected info to preserve queued action file, got %v", err)
+	}
+	if !strings.Contains(out, "\"action\": \"remove\"") {
+		t.Errorf("expected info to show queued remove action, got: %s", out)
+	}
+}
+
+func TestClearQueueRemovesQueuedAction(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "test-mob", "--no-launch")
+	sessionID := "queue-clear"
+	t.Setenv("CODEMOB_SESSION", sessionID)
+
+	cfg := readConfig(t, repoPath)
+	mobsDir, ok := cfg["mobs_dir"].(string)
+	if !ok || mobsDir == "" {
+		t.Fatalf("expected mobs_dir in config, got %v", cfg["mobs_dir"])
+	}
+	mobPath := filepath.Join(mobsDir, "test-mob")
+	queuePath := queuePath(repoPath, sessionID)
+
+	runCore(t, bin, mobPath, "queue", "remove", "@self")
+	if _, err := os.Stat(queuePath); err != nil {
+		t.Fatalf("expected queued action file to exist, got %v", err)
+	}
+
+	runCore(t, bin, mobPath, "clear-queue")
+
+	if _, err := os.Stat(queuePath); !os.IsNotExist(err) {
+		t.Fatalf("expected clear-queue to remove queued action, got %v", err)
+	}
+}
+
+func TestShellCdClearsQueuedActionForTargetMob(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "test-mob", "--no-launch")
+	sessionID := "shell-cd"
+	t.Setenv("CODEMOB_SESSION", sessionID)
+
+	cfg := readConfig(t, repoPath)
+	mobsDir, ok := cfg["mobs_dir"].(string)
+	if !ok || mobsDir == "" {
+		t.Fatalf("expected mobs_dir in config, got %v", cfg["mobs_dir"])
+	}
+	mobPath := filepath.Join(mobsDir, "test-mob")
+	queuePath := queuePath(repoPath, sessionID)
+
+	runCore(t, bin, mobPath, "queue", "remove", "@self")
+	if _, err := os.Stat(queuePath); err != nil {
+		t.Fatalf("expected queued action file to exist, got %v", err)
+	}
+
+	shellScript := fmt.Sprintf(
+		"source %q; cd %q; codemob cd test-mob; pwd",
+		filepath.Join(repoRoot(t), "codemob-shell.sh"),
+		repoPath,
+	)
+	out := runShell(t, bin, repoPath, shellScript)
+
+	if got := strings.TrimSpace(out); got != mobPath {
+		t.Fatalf("expected shell to cd into %s, got %s", mobPath, got)
+	}
+	if _, err := os.Stat(queuePath); !os.IsNotExist(err) {
+		t.Fatalf("expected codemob cd to clear queued action, got %v", err)
+	}
+}
+
+func TestShellCdRootClearsQueuedActionForCurrentSession(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "test-mob", "--no-launch")
+	sessionID := "shell-cd-root"
+	t.Setenv("CODEMOB_SESSION", sessionID)
+
+	cfg := readConfig(t, repoPath)
+	mobsDir, ok := cfg["mobs_dir"].(string)
+	if !ok || mobsDir == "" {
+		t.Fatalf("expected mobs_dir in config, got %v", cfg["mobs_dir"])
+	}
+	mobPath := filepath.Join(mobsDir, "test-mob")
+	queuePath := queuePath(repoPath, sessionID)
+
+	runCore(t, bin, mobPath, "queue", "remove", "@self")
+	if _, err := os.Stat(queuePath); err != nil {
+		t.Fatalf("expected queued action file to exist, got %v", err)
+	}
+
+	shellScript := fmt.Sprintf(
+		"source %q; cd %q; codemob cd root; pwd",
+		filepath.Join(repoRoot(t), "codemob-shell.sh"),
+		mobPath,
+	)
+	out := runShell(t, bin, repoPath, shellScript)
+
+	got := strings.TrimSpace(out)
+	resolvedGot, err := filepath.EvalSymlinks(got)
+	if err != nil {
+		t.Fatalf("failed to resolve shell cwd %s: %v", got, err)
+	}
+	resolvedRepoPath, err := filepath.EvalSymlinks(repoPath)
+	if err != nil {
+		t.Fatalf("failed to resolve repo path %s: %v", repoPath, err)
+	}
+	if resolvedGot != resolvedRepoPath {
+		t.Fatalf("expected shell to cd into %s, got %s", repoPath, got)
+	}
+	if _, err := os.Stat(queuePath); !os.IsNotExist(err) {
+		t.Fatalf("expected codemob cd root to clear queued action, got %v", err)
+	}
+}
+
+func TestShellClaudeClearsQueuedActionForCurrentMob(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "test-mob", "--no-launch")
+	sessionID := "shell-claude"
+	t.Setenv("CODEMOB_SESSION", sessionID)
+
+	cfg := readConfig(t, repoPath)
+	mobsDir, ok := cfg["mobs_dir"].(string)
+	if !ok || mobsDir == "" {
+		t.Fatalf("expected mobs_dir in config, got %v", cfg["mobs_dir"])
+	}
+	mobPath := filepath.Join(mobsDir, "test-mob")
+	queuePath := queuePath(repoPath, sessionID)
+
+	runCore(t, bin, mobPath, "queue", "remove", "@self")
+	if _, err := os.Stat(queuePath); err != nil {
+		t.Fatalf("expected queued action file to exist, got %v", err)
+	}
+
+	shellScript := fmt.Sprintf(
+		"source %q; cd %q; claude >/dev/null",
+		filepath.Join(repoRoot(t), "codemob-shell.sh"),
+		mobPath,
+	)
+	runShell(t, bin, repoPath, shellScript)
+
+	if _, err := os.Stat(queuePath); !os.IsNotExist(err) {
+		t.Fatalf("expected shell claude launch to clear queued action, got %v", err)
+	}
+}
+
+func TestQueueIsolationBySession(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "test-mob", "--no-launch")
+
+	cfg := readConfig(t, repoPath)
+	mobPath := filepath.Join(cfg["mobs_dir"].(string), "test-mob")
+	sessionA := "session-a"
+	sessionB := "session-b"
+
+	if out, err := runCoreWithSession(t, bin, mobPath, sessionA, "", "queue", "remove", "@self"); err != nil {
+		t.Fatalf("queue session-a failed: %v\n%s", err, out)
+	}
+	if out, err := runCoreWithSession(t, bin, mobPath, sessionB, "", "queue", "remove", "@self"); err != nil {
+		t.Fatalf("queue session-b failed: %v\n%s", err, out)
+	}
+
+	if _, err := os.Stat(queuePath(repoPath, sessionA)); err != nil {
+		t.Fatalf("expected session-a queue file, got %v", err)
+	}
+	if _, err := os.Stat(queuePath(repoPath, sessionB)); err != nil {
+		t.Fatalf("expected session-b queue file, got %v", err)
+	}
+
+	if out, err := runCoreWithSession(t, bin, mobPath, sessionA, "", "clear-queue"); err != nil {
+		t.Fatalf("clear-queue session-a failed: %v\n%s", err, out)
+	}
+
+	if _, err := os.Stat(queuePath(repoPath, sessionA)); !os.IsNotExist(err) {
+		t.Fatalf("expected session-a queue file to be removed, got %v", err)
+	}
+	if _, err := os.Stat(queuePath(repoPath, sessionB)); err != nil {
+		t.Fatalf("expected session-b queue file to remain, got %v", err)
 	}
 }
 

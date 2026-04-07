@@ -7,6 +7,8 @@ SHAREDIR := $(PREFIX)/share/codemob
 
 .PHONY: build install uninstall test clean release-dry-run
 
+SESSION_QUEUE_TESTS := TestQueueUnknownAction|TestQueueSwitchRequiresTarget|TestQueueRequiresSession|TestClearQueueRequiresSession|TestInfoDoesNotClearQueuedAction|TestClearQueueRemovesQueuedAction|TestShellCdClearsQueuedActionForTargetMob|TestShellCdRootClearsQueuedActionForCurrentSession|TestShellClaudeClearsQueuedActionForCurrentMob|TestQueueIsolationBySession
+
 build:
 	@echo "Building codemob $(VERSION)..."
 	@go build $(LDFLAGS) -o codemob .
@@ -33,6 +35,11 @@ uninstall:
 
 test:
 	@go test ./... -count=1 -v
+
+test-session-queue:
+	@go test ./internal/mob -run '$(SESSION_QUEUE_TESTS)' -count=1 -v
+
+test-branch: test-session-queue
 
 clean:
 	@rm -f codemob

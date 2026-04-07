@@ -98,14 +98,13 @@ If they choose a DIFFERENT mob (not the one marked with ◀), run ` + "`codemob 
 
 If they choose the CURRENT mob (marked with ◀):
 
-` + confirmationGuardExit + `
-Run this exact command:
+` + confirmationGuardExit + `Run this exact command using the Bash tool:
 
 ` + "```" + `
-codemob queue remove "$CODEMOB_MOB"
+codemob queue remove @self
 ` + "```" + `
 
-$CODEMOB_MOB is already set in your environment. There is no need to echo it - the command above will resolve it automatically.
+If the command fails, tell the user: "This command can only be used from within a codemob workspace." and stop.
 `,
 	},
 	"drop": {
@@ -113,10 +112,8 @@ $CODEMOB_MOB is already set in your environment. There is no need to echo it - t
 		Body: confirmationGuardExit + `Run this exact command using the Bash tool:
 
 ` + "```" + `
-codemob queue remove "$CODEMOB_MOB"
+codemob queue remove @self
 ` + "```" + `
-
-$CODEMOB_MOB is already set in your environment. There is no need to echo it - the command above will resolve it automatically.
 
 If the command fails, tell the user: "This command can only be used from within a codemob workspace." and stop.
 `,
