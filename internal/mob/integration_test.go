@@ -766,6 +766,15 @@ func TestPurge(t *testing.T) {
 		t.Fatalf("clear failed: %s\n%s", err, out)
 	}
 
+	// then -> output lists mob names before confirmation
+	outStr := string(out)
+	if !strings.Contains(outStr, "one") {
+		t.Error("purge output should list mob 'one'")
+	}
+	if !strings.Contains(outStr, "two") {
+		t.Error("purge output should list mob 'two'")
+	}
+
 	// then -> no mobs
 	cfg := readConfig(t, repoPath)
 	mobs, _ := cfg["mobs"].([]interface{})

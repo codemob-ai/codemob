@@ -663,7 +663,12 @@ func cmdPurge(_ []string) error {
 	fmt.Println()
 	fmt.Printf("  %s⚠ DESTRUCTIVE OPERATION%s\n", r, rst)
 	fmt.Println()
-	fmt.Printf("  This will permanently remove all %s%d mob(s)%s and their worktrees.\n", r, len(cfg.Mobs), rst)
+	fmt.Println("  The following mobs will be permanently removed:")
+	fmt.Println()
+	for _, m := range cfg.Mobs {
+		fmt.Printf("    %s✗%s %s\n", r, rst, m.Name)
+	}
+	fmt.Println()
 	fmt.Printf("  Any %suncommitted or unpushed changes%s in those worktrees will be %spermanently lost%s.\n", r, rst, r, rst)
 	fmt.Println()
 	fmt.Printf("  %sThis cannot be undone.%s\n", r, rst)
