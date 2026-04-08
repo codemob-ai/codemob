@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -665,9 +666,16 @@ func cmdPurge(_ []string) error {
 	fmt.Println()
 	fmt.Println("  The following mobs will be permanently removed:")
 	fmt.Println()
+	var buf bytes.Buffer
+	w := tabwriter.NewWriter(&buf, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "NAME\tBRANCH")
 	for _, m := range cfg.Mobs {
 		branch := mob.ActualBranch(root, cfg, &m)
-		fmt.Printf("    %s✗%s %s  (branch: %s)\n", r, rst, m.Name, branch)
+		fmt.Fprintf(w, "%s\t%s\n", m.Name, branch)
+	}
+	w.Flush()
+	for _, line := range strings.Split(strings.TrimRight(buf.String(), "\n"), "\n") {
+		fmt.Printf("    %s\n", line)
 	}
 	fmt.Println()
 	fmt.Printf("  Any %suncommitted or unpushed changes%s in those worktrees will be %spermanently lost%s.\n", r, rst, r, rst)
