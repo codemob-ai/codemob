@@ -62,7 +62,7 @@ brews:
     directory: Formula
     homepage: "https://github.com/codemob-ai/codemob"
     description: "AI agent workspace manager — parallel isolated sessions via git worktrees"
-    license: "GPL-3.0-only"
+    license: "Apache-2.0"
     install: |
       bin.install "codemob"
       (share/"codemob").install "codemob-shell.sh"
