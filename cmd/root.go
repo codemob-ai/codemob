@@ -667,7 +667,7 @@ func cmdPurge(_ []string) error {
 	fmt.Println()
 	for _, m := range cfg.Mobs {
 		branch := mob.ActualBranch(root, cfg, &m)
-		fmt.Printf("    %s✗%s %s  (%s)\n", r, rst, m.Name, branch)
+		fmt.Printf("    %s✗%s %s  (branch: %s)\n", r, rst, m.Name, branch)
 	}
 	fmt.Println()
 	fmt.Printf("  Any %suncommitted or unpushed changes%s in those worktrees will be %spermanently lost%s.\n", r, rst, r, rst)
