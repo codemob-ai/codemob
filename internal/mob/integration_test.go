@@ -766,13 +766,13 @@ func TestPurge(t *testing.T) {
 		t.Fatalf("clear failed: %s\n%s", err, out)
 	}
 
-	// then -> output lists mob names before confirmation
+	// then -> output lists mob names and branches before confirmation
 	outStr := string(out)
-	if !strings.Contains(outStr, "one") {
-		t.Error("purge output should list mob 'one'")
+	if !strings.Contains(outStr, "one") || !strings.Contains(outStr, "mob/one") {
+		t.Errorf("purge output should list mob 'one' with branch, got: %s", outStr)
 	}
-	if !strings.Contains(outStr, "two") {
-		t.Error("purge output should list mob 'two'")
+	if !strings.Contains(outStr, "two") || !strings.Contains(outStr, "mob/two") {
+		t.Errorf("purge output should list mob 'two' with branch, got: %s", outStr)
 	}
 
 	// then -> no mobs
