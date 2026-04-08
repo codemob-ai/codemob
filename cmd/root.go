@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -663,7 +664,20 @@ func cmdPurge(_ []string) error {
 	fmt.Println()
 	fmt.Printf("  %s⚠ DESTRUCTIVE OPERATION%s\n", r, rst)
 	fmt.Println()
-	fmt.Printf("  This will permanently remove all %s%d mob(s)%s and their worktrees.\n", r, len(cfg.Mobs), rst)
+	fmt.Println("  The following mobs will be permanently removed:")
+	fmt.Println()
+	var buf bytes.Buffer
+	w := tabwriter.NewWriter(&buf, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "NAME\tBRANCH")
+	for _, m := range cfg.Mobs {
+		branch := mob.ActualBranch(root, cfg, &m)
+		fmt.Fprintf(w, "%s\t%s\n", m.Name, branch)
+	}
+	w.Flush()
+	for _, line := range strings.Split(strings.TrimRight(buf.String(), "\n"), "\n") {
+		fmt.Printf("    %s\n", line)
+	}
+	fmt.Println()
 	fmt.Printf("  Any %suncommitted or unpushed changes%s in those worktrees will be %spermanently lost%s.\n", r, rst, r, rst)
 	fmt.Println()
 	fmt.Printf("  %sThis cannot be undone.%s\n", r, rst)
