@@ -12,6 +12,7 @@ var ValidQueueActions = map[string]bool{
 	"new":          true,
 	"remove":       true,
 	"change-agent": true,
+	"cd":           true,
 }
 
 const queuesDir = ".codemob/queues"

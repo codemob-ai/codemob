@@ -1732,6 +1732,60 @@ func TestSlashCommandsCopiedToExternalWorktree(t *testing.T) {
 	}
 }
 
+func TestQueueCdWritesCdRequestFile(t *testing.T) {
+	bin := buildCore(t)
+	_, repoPath := setupTestRepo(t)
+	initRepo(t, bin, repoPath)
+	runCore(t, bin, repoPath, "new", "cd-mob", "--no-launch")
+
+	cfg := readConfig(t, repoPath)
+	mobsDir := cfg["mobs_dir"].(string)
+	mobPath := filepath.Join(mobsDir, "cd-mob")
+
+	sessionID := "test-cd-session"
+	t.Setenv("CODEMOB_SESSION", sessionID)
+
+	// when -> queue a cd action from inside the mob
+	runCore(t, bin, mobPath, "queue", "cd")
+
+	// then -> queue file should exist
+	queueFile := filepath.Join(repoPath, ".codemob", "queues", "cd-mob.json")
+	data, err := os.ReadFile(queueFile)
+	if err != nil {
+		t.Fatalf("expected queue file, got %v", err)
+	}
+	if !strings.Contains(string(data), `"action": "cd"`) {
+		t.Errorf("expected cd action in queue file, got: %s", data)
+	}
+	if !strings.Contains(string(data), `"target": "cd-mob"`) {
+		t.Errorf("expected target=cd-mob in queue file, got: %s", data)
+	}
+
+	// when -> check-queue processes it
+	runCore(t, bin, mobPath, "check-queue")
+
+	// then -> queue file should be cleared
+	if _, err := os.Stat(queueFile); !os.IsNotExist(err) {
+		t.Errorf("expected queue file to be cleared after check-queue")
+	}
+
+	// then -> cd request file should exist with the mob path
+	cdFile := "/tmp/codemob-cd-" + sessionID
+	cdData, err := os.ReadFile(cdFile)
+	if err != nil {
+		t.Fatalf("expected cd request file, got %v", err)
+	}
+	defer os.Remove(cdFile)
+
+	got := string(cdData)
+	if clean, err := filepath.EvalSymlinks(mobPath); err == nil {
+		mobPath = clean
+	}
+	if got != mobPath {
+		t.Errorf("expected cd request path %q, got %q", mobPath, got)
+	}
+}
+
 func TestNewCdPrintsWorktreePath(t *testing.T) {
 	bin := buildCore(t)
 	_, repoPath := setupTestRepo(t)

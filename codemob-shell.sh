@@ -32,9 +32,19 @@ codemob() {
         cd "$dir"
       else
         command codemob "$@"
+        local ec=$?
+        local _cdf="/tmp/codemob-cd-${CODEMOB_SESSION:-}"
+        [ -f "$_cdf" ] && { cd "$(cat "$_cdf")"; rm -f "$_cdf"; }
+        return $ec
       fi
       ;;
-    *)  command codemob "$@" ;;
+    *)
+      command codemob "$@"
+      local ec=$?
+      local _cdf="/tmp/codemob-cd-${CODEMOB_SESSION:-}"
+      [ -f "$_cdf" ] && { cd "$(cat "$_cdf")"; rm -f "$_cdf"; }
+      return $ec
+      ;;
   esac
 }
 
@@ -60,6 +70,8 @@ claude() {
       CODEMOB_MOB="$codemob_mob" command claude "${extra_args[@]}" "$@"
       local ec=$?
       CODEMOB_MOB="$codemob_mob" codemob check-queue 2>/dev/null
+      local _cdf="/tmp/codemob-cd-${CODEMOB_SESSION:-}"
+      [ -f "$_cdf" ] && { cd "$(cat "$_cdf")"; rm -f "$_cdf"; }
       return $ec
       ;;
   esac
@@ -83,6 +95,8 @@ codex() {
       CODEMOB_MOB="$codemob_mob" command codex "${extra_args[@]}" "$@"
       local ec=$?
       CODEMOB_MOB="$codemob_mob" codemob check-queue 2>/dev/null
+      local _cdf="/tmp/codemob-cd-${CODEMOB_SESSION:-}"
+      [ -f "$_cdf" ] && { cd "$(cat "$_cdf")"; rm -f "$_cdf"; }
       return $ec
       ;;
   esac

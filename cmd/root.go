@@ -776,6 +776,16 @@ func cmdCheckNext(_ []string) error {
 	}
 	mob.ClearQueue(root, mobName)
 
+	if next.Action == "cd" {
+		cfg, err := mob.LoadConfig(root)
+		if err == nil {
+			if m := mob.FindMob(cfg, next.Target); m != nil {
+				writeCdRequest(mob.MobPath(root, cfg, m.Name))
+			}
+		}
+		return nil
+	}
+
 	return executeNextAction(root, next)
 }
 
@@ -890,6 +900,14 @@ func cmdWriteNext(args []string) error {
 		target = args[1]
 	}
 
+	// For cd, default to the current mob
+	if target == "" && action == "cd" {
+		target = mob.CurrentMobName()
+		if target == "" {
+			return fmt.Errorf("cd: not inside a mob")
+		}
+	}
+
 	// Validate: switch, remove, and change-agent require a target
 	if target == "" && (action == "switch" || action == "remove" || action == "change-agent") {
 		return fmt.Errorf("codemob queue %s requires a target", action)
@@ -947,6 +965,17 @@ func launchAgent(root, agent, workdir string, resume bool) error {
 		}
 		mob.ClearQueue(root, mobName)
 
+		if next.Action == "cd" {
+			cfg, err := mob.LoadConfig(root)
+			if err == nil {
+				if m := mob.FindMob(cfg, next.Target); m != nil {
+					writeCdRequest(mob.MobPath(root, cfg, m.Name))
+				}
+			}
+			writeLastMob(workdir)
+			return nil
+		}
+
 		newWorkdir, newAgent, newResume, err := resolveNextAction(root, next)
 		if err != nil {
 			return err
@@ -958,6 +987,17 @@ func launchAgent(root, agent, workdir string, resume bool) error {
 		agent = newAgent
 		resume = newResume
 	}
+}
+
+// writeCdRequest writes the target worktree path to a temp file so the shell
+// can cd into it after the Go binary exits. The file is keyed by CODEMOB_SESSION
+// to avoid collisions between parallel terminals.
+func writeCdRequest(path string) {
+	sessionID := os.Getenv("CODEMOB_SESSION")
+	if sessionID == "" {
+		return
+	}
+	os.WriteFile("/tmp/codemob-cd-"+sessionID, []byte(path), 0644)
 }
 
 // readLastMob returns the last active mob name for this terminal session.

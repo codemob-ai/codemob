@@ -108,6 +108,28 @@ codemob queue remove "$CODEMOB_MOB"
 $CODEMOB_MOB is already set in your environment. There is no need to echo it - the command above will resolve it automatically.
 `,
 	},
+	"cd-here": {
+		Description: "Navigate terminal to this mob's worktree directory",
+		Body: `IMPORTANT: Before running the codemob queue command, you MUST get explicit confirmation from the user. Tell them exactly this (preserve the line breaks):
+
+"This will end our current conversation and navigate your terminal into this mob's worktree directory.
+You can then explore the files, run commands, or start a new agent session.
+
+To return to the repo root, run ` + "`codemob cd root`" + `.
+
+Are you sure?"
+
+Only run the queue command after the user confirms. If they decline, cancel the operation.
+
+Run this exact command using the Bash tool:
+
+` + "```" + `
+codemob queue cd
+` + "```" + `
+
+If the command fails, tell the user: "This command can only be used from within a codemob workspace." and stop.
+`,
+	},
 	"drop": {
 		Description: "Remove the current codemob workspace and exit",
 		Body: confirmationGuardExit + `Run this exact command using the Bash tool:
